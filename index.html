@@ -766,6 +766,32 @@ async function autoLoad(){
     statusEl.textContent += ` / TSEPrime 読込エラー: ${e.message}`;
   }
   
+  // 4) プルダウン用リスト
+  const idxNamesFromData = uniqSorted(idxRows.map(r => r.name));
+  const tseNamesFromData = uniqSorted(tseRows.map(r => r.name));
+
+  let idxList = null;
+  let tseList = null;
+  try{
+    idxList = await loadNameList("./list.csv");
+  }catch(e){
+    console.warn(e);
+  }
+  try{
+    tseList = await loadNameList("./bumonlist.csv");
+  }catch(e){
+    console.warn(e);
+  }
+
+  idxAvail = (idxList ? idxList.filter(n => idxNamesFromData.includes(n)) : idxNamesFromData);
+  if(idxAvail.length === 0) idxAvail = idxNamesFromData;
+
+  tseAvail = (tseList ? tseList.filter(n => tseNamesFromData.includes(n)) : tseNamesFromData);
+  if(tseAvail.length === 0) tseAvail = tseNamesFromData;
+
+  // 5) 共有日付軸
+  globalDates = buildGlobalDates(idxRows, tseRows);
+  
   // restore last selections
   try{
     const k = localStorage.getItem("idxKey_v1");
