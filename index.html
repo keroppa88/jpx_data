@@ -739,31 +739,31 @@ function bindSelects(){
 async function autoLoad(){
   const statusEl = document.getElementById("status");
 
-  statusEl.textContent = "PtoCSV.csv 読み込み中…";
-  const res1 = await fetch("./PtoCSV.csv", {cache:"no-store"});
-  if(!res1.ok) throw new Error(`PtoCSV.csv fetch失敗: ${res1.status} ${res1.statusText}`);
+// 2) 指数データ（固定: ./PtoCSV_long.csv）
+idxRows = [];
+try{
+  statusEl.textContent = "PtoCSV_long.csv 読み込み中…";
+  const res1 = await fetch("./PtoCSV_long.csv", {cache:"no-store"});
+  if(!res1.ok) throw new Error(`PtoCSV_long.csv fetch失敗: ${res1.status} ${res1.statusText}`);
   const txt1 = await res1.text();
-  idxRows = parsePtoCsvToLong(txt1);
+  idxRows = parsePtoCsvToLong(txt1); // long形式ならこのパーサでOK
+}catch(e){
+  console.warn(e);
+  statusEl.textContent = `PtoCSV_long.csv 読込エラー: ${e.message}`;
+}
 
-  statusEl.textContent = "list.csv 読み込み中…";
-  const list = await loadNameList("./list.csv");
-  const allIdxNames = uniqSorted(idxRows.map(r=>r.name));
-  idxAvail = (list ? list.filter(n => allIdxNames.includes(n)) : []);
-  if(idxAvail.length === 0) idxAvail = allIdxNames; // “まず動く” fallback
-
-  statusEl.textContent = "TSEPrime.csv 読み込み中…";
+// 3) 部門別データ（固定: ./data/TSEPrime.csv）
+tseRows = [];
+try{
+  statusEl.textContent += " / TSEPrime.csv 読み込み中…";
   const res2 = await fetch("./data/TSEPrime.csv", {cache:"no-store"});
   if(!res2.ok) throw new Error(`data/TSEPrime.csv fetch失敗: ${res2.status} ${res2.statusText}`);
   const txt2 = await res2.text();
   tseRows = parseTsePrimeToLong(txt2);
-
-  statusEl.textContent = "bumonlist.csv 読み込み中…";
-  const bumon = await loadNameList("./bumonlist.csv");
-  const allTseNames = uniqSorted(tseRows.map(r=>r.name));
-  tseAvail = (bumon ? bumon.filter(n => allTseNames.includes(n)) : []);
-  if(tseAvail.length === 0) tseAvail = allTseNames; // “まず動く” fallback
-
-  globalDates = buildGlobalDates(idxRows, tseRows);
+}catch(e){
+  console.warn(e);
+  statusEl.textContent += ` / TSEPrime 読込エラー: ${e.message}`;
+}
 
   // restore last selections
   try{
