@@ -13,7 +13,7 @@ const SECTIONS = process.env.JQUANTS_TRADE_SECTIONS
   : ["TSEPrime"];
 
 // ●データ取得期間
-const FROM_DATE = process.env.JQUANTS_TRADE_FROM || "2023-01-01";
+const FROM_DATE = process.env.JQUANTS_TRADE_FROM || "2022-01-01";
 
 // YYYY-MM-DD 形式で今日の日付を生成
 const today = new Date().toISOString().slice(0, 10);
