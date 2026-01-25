@@ -16,14 +16,7 @@ jobs:
       
       # 株価データ更新
       - name: Update Stock Data
-        run: node update_daily.js
-        env:
-          JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
-
-     
-      # 財務情報更新
-      - name: Update Finance Data
-        run: node update_f_daily.js
+        run: node updata_sankasha.js
         env:
           JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
 
