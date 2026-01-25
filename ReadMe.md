@@ -1,20 +1,20 @@
 # ReadMe
 ### 何？
-jpxが発表する投資部門別売買動向をjpxのAPIで取得する。
-昔は「投資主体別売買動向」など。
-update_bumon.jsが木金月火の18時台に稼働して情報を取得する。
-dataフォルダ内のcsvを都度、上書きする。
-csvをindex.htmlで閲覧する。
+* jpxが発表する投資部門別売買動向をjpxのAPIで取得する。
+* 昔は「投資主体別売買動向」など。
+* update_bumon.jsが木金月火の18時台に稼働して情報を取得する。
+* dataフォルダ内のcsvを都度、上書きする。
+* csvをindex.htmlで閲覧する。
 
 ### 情報発表タイミング
-投資部門別情報・週次の第4営業日＝木曜日の18:00頃
-通常は木曜日、祝日等非営業日がある場合はその分後ろ倒し。
-連休等により通常と異なる公表スケジュールとなる場合はこちら。
-https://www.jpx.co.jp/markets/statistics-equities/investor-type/index.html
+* 投資部門別情報・週次の第4営業日＝木曜日の18:00頃
+* 通常は木曜日、祝日等非営業日がある場合はその分後ろ倒し。
+* 連休等により通常と異なる公表スケジュールとなる場合はこちら。
+* https://www.jpx.co.jp/markets/statistics-equities/investor-type/index.html
 
 ### 各項目定義
-総計＝自己＋委託
-委託＝自己以外の全て
+* 総計＝自己＋委託
+* 委託＝自己以外の全て
 
 ### 各項目の対応
 公表日	PubDate
