@@ -1,7 +1,7 @@
 name: Update
 on:
   schedule:
-  - cron: '30 9 * * 1,2,4,5'  # JST 18:30（UTC 09:30）月火木金
+    - cron: '30 9 * * 1,2,4,5'  # JST 18:30（UTC 09:30）月火木金
   workflow_dispatch:
 permissions:
   contents: write
