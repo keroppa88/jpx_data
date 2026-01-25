@@ -319,6 +319,14 @@ function getVisibleWindowForDates(dates){
   );
   return { visibleDates, visibleAbsIndices };
 }
+function buildDateIndex(dates){
+  const map = new Map();
+  dates.forEach((d,i)=>{ map.set(d, i); });
+  return map;
+}
+function mapVisibleDatesToAbsIndices(dateIndex, visibleDates){
+  return visibleDates.map(d => (d && dateIndex && dateIndex.has(d) ? dateIndex.get(d) : null));
+}
 function updateTopChips(){
   const latestEl = document.getElementById("latestChip");
   const viewEl = document.getElementById("viewChip");
@@ -623,15 +631,11 @@ function showTooltipForCanvas(e, canvas, data){
     return;
   }
   const absIdx = p.absIndex;
-  if(absIdx==null){
-    tooltip.style.display='none';
-    return;
-  }
-
-  const date = data.dates[absIdx] || p.date || "";
+  const date = p.date || (absIdx!=null ? data.dates[absIdx] : "") || "";
   let html = `<strong>${date}</strong><br>`;
   for(const s of data.series){
-    html += `<span style="color:${s.color}; font-weight:700;">${s.label}</span>: ${fmt(s.values[absIdx])}<br>`;
+    const val = (absIdx!=null ? s.values[absIdx] : null);
+    html += `<span style="color:${s.color}; font-weight:700;">${s.label}</span>: ${fmt(val)}<br>`;
   }
   tooltip.innerHTML = html;
   tooltip.style.display='block';
@@ -700,15 +704,18 @@ function onMouseLeave(){
 /* ========= redraw ========= */
 function rebuildData(){
   idxData = { dates: idxDates, series: (idxKey ? [buildOneSeries(idxRows, idxKey, INITIAL_COLORS[0], idxDates)] : []) };
+  idxData.dateIndex = buildDateIndex(idxDates);
   tseData = buildMultiSeries(tseRows, tseKeys, tseDates);
+  tseData.dateIndex = buildDateIndex(tseDates);
   renderLegend("idxLegend", idxData);
   renderLegend("tseLegend", tseData);
 }
 function redrawAll(){
-  const idxWindow = getVisibleWindowForDates(idxDates);
-  const tseWindow = getVisibleWindowForDates(tseDates);
-  drawChartGeneric(idxCtx, idxCanvas, idxData, idxWindow.visibleDates, idxWindow.visibleAbsIndices);
-  drawChartGeneric(tseCtx, tseCanvas, tseData, tseWindow.visibleDates, tseWindow.visibleAbsIndices);
+  const globalWindow = getVisibleWindowForDates(globalDates);
+  const idxAbsIndices = mapVisibleDatesToAbsIndices(idxData && idxData.dateIndex, globalWindow.visibleDates);
+  const tseAbsIndices = mapVisibleDatesToAbsIndices(tseData && tseData.dateIndex, globalWindow.visibleDates);
+  drawChartGeneric(idxCtx, idxCanvas, idxData, globalWindow.visibleDates, idxAbsIndices);
+  drawChartGeneric(tseCtx, tseCanvas, tseData, globalWindow.visibleDates, tseAbsIndices);
 }
 
 /* ========= select UI ========= */
