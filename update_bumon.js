@@ -1,5 +1,5 @@
-// J-Quants v2 /v2/equities/investor-types を取得してCSV保存（v2短縮ヘッダーのまま）
-
+// 投資部門別売買状況を取得する。
+//取得情報をdataフォルダのcsvに上書きする設定。
 
 const https = require("https");
 const fs = require("fs");
