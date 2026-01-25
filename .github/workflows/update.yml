@@ -13,16 +13,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Ensure update script is present
-        run: |
-          if [ -f update_bumon,js ] && [ ! -f update_bumon.js ]; then
-            mv update_bumon,js update_bumon.js
-          fi
-          if [ ! -f update_bumon.js ]; then
-            echo "update_bumon.js not found in $(pwd)" >&2
-            ls -la
-            exit 1
-          fi
           
       # 投資部門別売買状況データ更新
       - name: Update_bumon
