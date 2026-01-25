@@ -21,8 +21,6 @@
       background:var(--bg); color:var(--text);
     }
     .wrap{ width:100%; margin:0 auto; }
-    .uiWrap{ max-width:1240px; margin:0 auto; }
-
     .card{
       background:var(--card); border:1px solid var(--line);
       border-radius:14px; box-shadow:var(--shadow);
@@ -35,7 +33,6 @@
     }
     .header h1{ margin:0; font-size:16px; letter-spacing:0.2px; }
     .sub{ font-size:12px; color:var(--muted); }
-
     .headerRight{
       margin-left:auto;
       display:flex;
@@ -44,7 +41,6 @@
       flex-wrap:wrap;
       justify-content:flex-end;
     }
-
     .rows{ margin-top:10px; display:flex; flex-direction:column; gap:10px; }
 
     .controls{
@@ -75,22 +71,8 @@
     }
     .chip .muted{ color:var(--muted); }
 
-    .legend{ display:flex; gap:16px; flex-wrap:wrap; align-items:center; }
-    .legend-item{ display:flex; align-items:center; gap:6px; font-size:12px; color:#374151; }
-    .swatch{ width:12px; height:12px; border-radius:3px; border:1px solid rgba(0,0,0,0.15); }
-
-    .grid2{
-      display:grid;
-      grid-template-columns: 1fr;
-      gap:12px;
-      margin-top:12px;
-    }
-    .chartCard{
-      border:1px solid var(--line);
-      border-radius:12px;
-      background:#fff;
-      overflow:hidden;
-    }
+    .grid2{ display:grid; grid-template-columns: 1fr; gap:12px; margin-top:12px; }
+    .chartCard{ border:1px solid var(--line); border-radius:12px; background:#fff; overflow:hidden; }
     .chartHead{
       display:flex;
       align-items:center;
@@ -100,19 +82,21 @@
       border-bottom:1px solid var(--line);
       flex-wrap:wrap;
     }
-    .chartTitle{
-      font-weight:700;
-      font-size:13px;
-      color:#111827;
-      margin-right:auto;
-    }
-    .symbox{
+    .chartTitle{ font-weight:700; font-size:13px; color:#111827; margin-right:auto; }
+
+    .legend{ display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
+    .legend-item{ display:flex; align-items:center; gap:6px; font-size:12px; color:#374151; }
+    .swatch{ width:12px; height:12px; border-radius:3px; border:1px solid rgba(0,0,0,0.15); }
+
+    /* Pull-down area (explicit, always visible) */
+    .selRow{
       display:flex;
       gap:10px;
       flex-wrap:wrap;
+      align-items:center;
       width:100%;
     }
-    .symitem{
+    .sel{
       display:flex;
       align-items:center;
       gap:8px;
@@ -120,62 +104,27 @@
       border:1px solid var(--line);
       background:#fff;
       border-radius:12px;
-      min-width:0;
     }
-    .symitem .slot{ width:18px; text-align:right; font-size:12px; color:var(--muted); flex:0 0 auto; }
-    .symitem .nameSel{
-      width:220px;
-      min-width:0;
-      padding:6px 8px;
-      border:1px solid #cfd4dc; border-radius:10px;
-      background:#fff; font-size:13px;
-      flex:1 1 auto;
-    }
-    .symitem .colorBtn{
-      width:34px; height:28px;
-      border:1px solid #cfd4dc; border-radius:10px;
-      background:#fff;
-      display:flex; align-items:center; justify-content:center;
-      cursor:pointer;
+    .sel .slot{
+      width:18px;
+      text-align:right;
+      font-size:12px;
+      color:var(--muted);
       flex:0 0 auto;
-      position:relative;
     }
-    .symitem .colorSwatch{
-      width:16px; height:16px; border-radius:4px;
-      border:1px solid rgba(0,0,0,0.18);
-      display:inline-block;
-    }
-    .colorMenu{
-      position:absolute;
-      top:34px; right:0;
-      background:#fff;
+    select{
+      min-width:240px;
+      padding:6px 8px;
       border:1px solid #cfd4dc;
-      border-radius:12px;
-      box-shadow:0 10px 26px rgba(0,0,0,0.16);
-      padding:8px;
-      display:none;
-      z-index:200;
-    }
-    .colorMenu.open{ display:block; }
-    .colorGrid{
-      display:grid;
-      grid-template-columns: repeat(3, 22px);
-      gap:8px;
-    }
-    .colorOpt{
-      width:22px; height:22px;
-      border-radius:6px;
-      border:1px solid rgba(0,0,0,0.18);
-      cursor:pointer;
+      border-radius:10px;
+      background:#fff;
+      font-size:13px;
     }
 
-    .canvasBox{
-      position:relative;
-      background:#fff;
-    }
+    .canvasBox{ position:relative; background:#fff; }
     canvas{ display:block; width:100%; cursor:crosshair; }
     #idxChart{ height:260px; }
-    #tseChart{ height:780px; } /* idx の約3倍 */
+    #tseChart{ height:520px; } /* 以前の半分（780 -> 520） */
 
     .tooltip{
       position:fixed;
@@ -214,22 +163,35 @@
         </div>
 
         <div class="grid2">
+          <!-- ===== Index chart (1 pull-down) ===== -->
           <div class="chartCard">
             <div class="chartHead">
               <div class="chartTitle">株価指数（PtoCSV.csv / list.csv）</div>
               <div class="legend" id="idxLegend"></div>
-              <div class="symbox" id="idxSymbolBox"></div>
+              <div class="selRow" id="idxSelRow">
+                <div class="sel">
+                  <div class="slot">1</div>
+                  <select id="idxSel1"></select>
+                </div>
+              </div>
             </div>
             <div class="canvasBox">
               <canvas id="idxChart"></canvas>
             </div>
           </div>
 
+          <!-- ===== TSE chart (5 pull-downs) ===== -->
           <div class="chartCard">
             <div class="chartHead">
               <div class="chartTitle">部門別売買動向（TSEPrime.csv / bumonlist.csv）</div>
               <div class="legend" id="tseLegend"></div>
-              <div class="symbox" id="tseSymbolBox"></div>
+              <div class="selRow" id="tseSelRow">
+                <div class="sel"><div class="slot">1</div><select id="tseSel1"></select></div>
+                <div class="sel"><div class="slot">2</div><select id="tseSel2"></select></div>
+                <div class="sel"><div class="slot">3</div><select id="tseSel3"></select></div>
+                <div class="sel"><div class="slot">4</div><select id="tseSel4"></select></div>
+                <div class="sel"><div class="slot">5</div><select id="tseSel5"></select></div>
+              </div>
             </div>
             <div class="canvasBox">
               <canvas id="tseChart"></canvas>
@@ -250,7 +212,6 @@ const COLOR_PALETTE = [
   { hex: "#000000" }, { hex: "#990099" }, { hex: "#84919E" }
 ];
 const INITIAL_COLORS = ["#FF4B00","#005AFF","#03AF7A","#4DC4FF","#F6AA00","#FFF100"];
-const MAX_SYMBOLS = 6;
 const MAX_DISPLAY = 700;
 
 /* ========= TSEPrime: 英語列名 -> 日本語表示名 ========= */
@@ -273,62 +234,28 @@ const TSEPRIME_FIELD_MAP = {
 /* ========= state ========= */
 let idxRows = [];   // {date,name,value}
 let tseRows = [];   // {date,name,value}
-let globalDates = []; // union sorted
+let globalDates = [];
 
 let displayCount = 200;
-let offsetX = 0; // shared pan: 0 means latest window
+let offsetX = 0; // shared
 
 let isDragging = false;
 let dragStartX = 0;
 let dragStartOffset = 0;
 let dragCanvas = null;
 
-let idxConfig = makeDefaultConfig("idx");
-let tseConfig = makeDefaultConfig("tse");
-
 let idxCanvas, idxCtx, tseCanvas, tseCtx, tooltip;
 
-/* ========= config ========= */
-function makeDefaultConfig(kind){
-  const base = [];
-  for(let i=0;i<MAX_SYMBOLS;i++){
-    base.push({
-      enabled: i < 2,
-      key: "",
-      label: "",
-      color: INITIAL_COLORS[i] || COLOR_PALETTE[i % COLOR_PALETTE.length].hex,
-      width: 2
-    });
-  }
-  // “まず動く”のため、list に合わせて後で自動採用する（autoLoad 内）
-  return base;
-}
+let idxAvail = [];
+let tseAvail = [];
 
-function paletteHexOrDefault(hex, fallback){
-  const h = String(hex||"").trim().toLowerCase();
-  const hit = COLOR_PALETTE.find(c => c.hex.toLowerCase() === h);
-  if(hit) return hit.hex;
-  if(fallback){
-    const fb = String(fallback).trim().toLowerCase();
-    const hit2 = COLOR_PALETTE.find(c => c.hex.toLowerCase() === fb);
-    if(hit2) return hit2.hex;
-  }
-  return COLOR_PALETTE[0].hex;
-}
+let idxKey = "";           // 1 item
+let tseKeys = ["","","","",""]; // 5 items
 
-function saveCfg(key, cfg){
-  try{ localStorage.setItem(key, JSON.stringify(cfg)); }catch(e){}
-}
-function loadCfg(key){
-  try{
-    const raw = localStorage.getItem(key);
-    if(!raw) return null;
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr : null;
-  }catch(e){ return null; }
-}
+let idxData = null;
+let tseData = null;
 
-/* ========= csv helpers ========= */
+/* ========= helpers ========= */
 function toNum(s){
   if(s==null) return NaN;
   return Number(String(s).replace(/,/g,'').replace(/"/g,'').trim());
@@ -348,9 +275,94 @@ function detectDelimiter(headerLine){
   const commaCount=(headerLine.match(/,/g)||[]).length;
   return tabCount>=commaCount ? "\t" : ",";
 }
+function uniqSorted(arr){
+  const set = new Set(arr);
+  const out = Array.from(set);
+  out.sort((a,b)=>String(a).localeCompare(String(b)));
+  return out;
+}
+function buildGlobalDates(idxRows, tseRows){
+  const set = new Set();
+  for(const r of idxRows){ if(r && r.date) set.add(r.date); }
+  for(const r of tseRows){ if(r && r.date) set.add(r.date); }
+  const arr = Array.from(set);
+  arr.sort((a,b)=>{
+    const ta=new Date(a).getTime(), tb=new Date(b).getTime();
+    if(!Number.isNaN(ta) && !Number.isNaN(tb)) return ta-tb;
+    return String(a).localeCompare(String(b));
+  });
+  return arr;
+}
+function clampView(){
+  const n = globalDates.length;
+  displayCount = Math.max(10, Math.min(displayCount, MAX_DISPLAY, n || 10));
+  const maxOffset = Math.max(0, n - displayCount);
+  offsetX = Math.max(0, Math.min(Math.round(offsetX), maxOffset));
+}
+function getVisibleWindow(){
+  clampView();
+  const n = globalDates.length;
+  const startRaw = n - displayCount - offsetX;
+  const endRaw = startRaw + displayCount;
+  const start = Math.max(0, startRaw);
+  const end = Math.min(n, endRaw);
+
+  const realDates = (start < end) ? globalDates.slice(start, end) : [];
+  const realLen = realDates.length;
+
+  const padN = displayCount - realLen;
+  const pads = new Array(Math.max(0,padN)).fill("");
+
+  const visibleDates = pads.concat(realDates);
+  const visibleAbsIndices = new Array(Math.max(0,padN)).fill(null).concat(
+    Array.from({length: realLen}, (_,i)=> start + i)
+  );
+  return { visibleDates, visibleAbsIndices };
+}
+function updateTopChips(){
+  const latestEl = document.getElementById("latestChip");
+  const viewEl = document.getElementById("viewChip");
+  if(!globalDates || globalDates.length===0){
+    latestEl.innerHTML = `<span class="muted">最新</span> -`;
+    viewEl.innerHTML = `<span class="muted">表示範囲</span> -`;
+    return;
+  }
+  latestEl.innerHTML = `<span class="muted">最新</span> ${globalDates[globalDates.length-1]}`;
+
+  const { visibleDates } = getVisibleWindow();
+  let startDate=null, endDate=null;
+  for(let i=0;i<visibleDates.length;i++){ if(visibleDates[i]){ startDate=visibleDates[i]; break; } }
+  for(let i=visibleDates.length-1;i>=0;i--){ if(visibleDates[i]){ endDate=visibleDates[i]; break; } }
+  viewEl.innerHTML = `<span class="muted">表示範囲</span> ${startDate&&endDate ? `${startDate} ~ ${endDate}` : '-'}`;
+}
+function syncCountControls(){
+  const r=document.getElementById('countRange');
+  const n=document.getElementById('countNum');
+  r.max=String(MAX_DISPLAY);
+  n.max=String(MAX_DISPLAY);
+  r.value=String(displayCount);
+  n.value=String(displayCount);
+}
+function bindControls(){
+  const countRange=document.getElementById('countRange');
+  const countNum=document.getElementById('countNum');
+
+  const setCount=(v)=>{
+    const nn=Number(v);
+    if(!Number.isFinite(nn)) return;
+    displayCount=Math.max(10, Math.min(Math.round(nn), MAX_DISPLAY, globalDates.length||MAX_DISPLAY));
+    offsetX=0;
+    countRange.value=String(displayCount);
+    countNum.value=String(displayCount);
+    updateTopChips();
+    redrawAll();
+  };
+
+  countRange.addEventListener('input', ()=>setCount(countRange.value));
+  countNum.addEventListener('change', ()=>setCount(countNum.value));
+}
 
 /* ========= parsers ========= */
-// PtoCSV.csv: 日付,曜日,日種類,商品名,数値 ...（列増えても headerで拾う）
 function parsePtoCsvToLong(text){
   const lines=text.trim().split(/\r?\n/);
   if(lines.length<2) throw new Error("PtoCSV.csv: データが空です");
@@ -375,7 +387,6 @@ function parsePtoCsvToLong(text){
   return rows;
 }
 
-// TSEPrime.csv(wide) -> long(date=PubDate, name=日本語, value)
 function parseTsePrimeToLong(text){
   const lines=text.trim().split(/\r?\n/);
   if(lines.length<2) throw new Error("TSEPrime.csv: データが空です");
@@ -388,7 +399,7 @@ function parseTsePrimeToLong(text){
   if(idxSection<0) throw new Error("TSEPrime.csv: 必須列(Section)が見つかりません");
 
   const fieldDefs = Object.entries(TSEPRIME_FIELD_MAP)
-    .map(([en, jp]) => ({ en, jp, idx: header.indexOf(en) }))
+    .map(([en, jp]) => ({ jp, idx: header.indexOf(en) }))
     .filter(x => x.idx >= 0);
 
   if(fieldDefs.length===0) throw new Error("TSEPrime.csv: 数値列が見つかりません（Field map 不一致）");
@@ -442,13 +453,6 @@ async function loadNameList(filename){
     }
     return uniq.length ? uniq : null;
   }
-  function matchCount(allNames, names){
-    if(!Array.isArray(allNames) || !Array.isArray(names)) return 0;
-    const set = new Set(allNames);
-    let c = 0;
-    for(const n of names){ if(set.has(n)) c++; }
-    return c;
-  }
 
   const tUtf8 = await fetchText('utf-8');
   const nUtf8 = parseToNames(tUtf8);
@@ -456,110 +460,30 @@ async function loadNameList(filename){
   const tSjis = await fetchText('shift-jis');
   const nSjis = parseToNames(tSjis);
 
-  // encoding choice: return both; caller will filter; here pick best-effort with "more items" heuristic
   if(!nUtf8 && !nSjis) return null;
   if(nUtf8 && !nSjis) return nUtf8;
   if(!nUtf8 && nSjis) return nSjis;
-
-  // both exist: choose longer (safer for “まず動く”)
   return (nSjis.length > nUtf8.length ? nSjis : nUtf8);
 }
 
-function uniqSortedDatesFromRows(rows){
-  const set=new Set();
-  for(const r of rows){ if(r && r.date) set.add(r.date); }
-  const arr=Array.from(set);
-  arr.sort((a,b)=>{
-    const ta=new Date(a).getTime(), tb=new Date(b).getTime();
-    if(!Number.isNaN(ta) && !Number.isNaN(tb)) return ta-tb;
-    return String(a).localeCompare(String(b));
-  });
-  return arr;
+/* ========= series building ========= */
+function buildOneSeries(rows, key, color){
+  const map = new Map();
+  for(const r of rows){ if(r.name===key) map.set(r.date, r.value); }
+  const values = globalDates.map(d => (map.has(d) ? map.get(d) : null));
+  return { label: key, color, width: 2, values };
 }
-
-function buildGlobalDates(idxRows, tseRows){
-  const set = new Set();
-  for(const r of idxRows){ if(r && r.date) set.add(r.date); }
-  for(const r of tseRows){ if(r && r.date) set.add(r.date); }
-  const arr = Array.from(set);
-  arr.sort((a,b)=>{
-    const ta=new Date(a).getTime(), tb=new Date(b).getTime();
-    if(!Number.isNaN(ta) && !Number.isNaN(tb)) return ta-tb;
-    return String(a).localeCompare(String(b));
-  });
-  return arr;
-}
-
-/* ========= series building on globalDates ========= */
-function buildSeriesOnGlobal(rows, cfg, globalDates){
-  const active = (cfg || []).filter(s => s && s.key);
-  const byName = new Map();
-  for(const s of active) byName.set(s.key, new Map());
-
-  for(const r of rows){
-    const m = byName.get(r.name);
-    if(!m) continue;
-    m.set(r.date, r.value);
+function buildMultiSeries(rows, keys){
+  const series = [];
+  for(let i=0;i<keys.length;i++){
+    const k = keys[i];
+    if(!k) continue;
+    series.push(buildOneSeries(rows, k, INITIAL_COLORS[i] || COLOR_PALETTE[i % COLOR_PALETTE.length].hex));
   }
-
-  const series = active.map(s=>{
-    const m = byName.get(s.key);
-    const values = globalDates.map(d=>{
-      const v = m.get(d);
-      return (v==null ? null : v);
-    });
-    return { label: s.label || s.key, color: s.color, width: s.width || 2, values };
-  });
-
   return { dates: globalDates, series };
 }
 
-/* ========= view window (shared) ========= */
-function clampView(){
-  const n = globalDates.length;
-  displayCount = Math.max(10, Math.min(displayCount, MAX_DISPLAY, n || 10));
-  const maxOffset = Math.max(0, n - displayCount);
-  offsetX = Math.max(0, Math.min(Math.round(offsetX), maxOffset));
-}
-function getVisibleWindow(){
-  clampView();
-  const n = globalDates.length;
-  const startRaw = n - displayCount - offsetX;
-  const endRaw = startRaw + displayCount;
-  const start = Math.max(0, startRaw);
-  const end = Math.min(n, endRaw);
-
-  const realDates = (start < end) ? globalDates.slice(start, end) : [];
-  const realLen = realDates.length;
-
-  const padN = displayCount - realLen;
-  const pads = new Array(Math.max(0,padN)).fill("");
-
-  const visibleDates = pads.concat(realDates);
-  const visibleAbsIndices = new Array(Math.max(0,padN)).fill(null).concat(
-    Array.from({length: realLen}, (_,i)=> start + i)
-  );
-  return { visibleDates, visibleAbsIndices };
-}
-
-function updateTopChips(){
-  const latestEl = document.getElementById("latestChip");
-  const viewEl = document.getElementById("viewChip");
-  if(!globalDates || globalDates.length===0){
-    latestEl.innerHTML = `<span class="muted">最新</span> -`;
-    viewEl.innerHTML = `<span class="muted">表示範囲</span> -`;
-    return;
-  }
-  latestEl.innerHTML = `<span class="muted">最新</span> ${globalDates[globalDates.length-1]}`;
-
-  const { visibleDates } = getVisibleWindow();
-  let startDate=null, endDate=null;
-  for(let i=0;i<visibleDates.length;i++){ if(visibleDates[i]){ startDate=visibleDates[i]; break; } }
-  for(let i=visibleDates.length-1;i>=0;i--){ if(visibleDates[i]){ endDate=visibleDates[i]; break; } }
-  viewEl.innerHTML = `<span class="muted">表示範囲</span> ${startDate&&endDate ? `${startDate} ~ ${endDate}` : '-'}`;
-}
-
-/* ========= UI render ========= */
+/* ========= draw ========= */
 function renderLegend(elId, data){
   const box = document.getElementById(elId);
   if(!box) return;
@@ -579,102 +503,7 @@ function renderLegend(elId, data){
   }
 }
 
-function closeAllColorMenus(except=null){
-  document.querySelectorAll('.colorMenu.open').forEach(el=>{
-    if(except && el === except) return;
-    el.classList.remove('open');
-  });
-}
-
-function renderSymbolBox(boxId, availableNames, cfg, cfgStorageKey, onChanged){
-  const box = document.getElementById(boxId);
-  if(!box) return;
-  box.innerHTML = '';
-
-  for(let i=0;i<MAX_SYMBOLS;i++){
-    const s = cfg[i] || {enabled:false,key:"",label:`${i+1}`,color:INITIAL_COLORS[i]||COLOR_PALETTE[0].hex,width:2};
-
-    const item = document.createElement('div');
-    item.className = 'symitem';
-
-    const slot = document.createElement('div');
-    slot.className = 'slot';
-    slot.textContent = String(i+1);
-    item.appendChild(slot);
-
-    const nameSel = document.createElement('select');
-    nameSel.className = 'nameSel';
-
-    const optEmpty = document.createElement('option');
-    optEmpty.value = '';
-    optEmpty.textContent = '—';
-    nameSel.appendChild(optEmpty);
-
-    for(const nm of availableNames){
-      const opt = document.createElement('option');
-      opt.value = nm;
-      opt.textContent = nm;
-      nameSel.appendChild(opt);
-    }
-
-    nameSel.value = s.key || '';
-    nameSel.addEventListener('change', ()=>{
-      cfg[i].key = nameSel.value;
-      cfg[i].label = nameSel.value ? nameSel.value : `項目${i+1}`;
-      cfg[i].enabled = !!nameSel.value;
-      saveCfg(cfgStorageKey, cfg);
-      onChanged();
-    });
-    item.appendChild(nameSel);
-
-    const colorBtn = document.createElement('button');
-    colorBtn.type = 'button';
-    colorBtn.className = 'colorBtn';
-
-    const sw = document.createElement('span');
-    sw.className = 'colorSwatch';
-    sw.style.background = paletteHexOrDefault(s.color, INITIAL_COLORS[i] || COLOR_PALETTE[0].hex);
-    colorBtn.appendChild(sw);
-
-    const menu = document.createElement('div');
-    menu.className = 'colorMenu';
-
-    const grid = document.createElement('div');
-    grid.className = 'colorGrid';
-
-    for(const c of COLOR_PALETTE){
-      const opt = document.createElement('div');
-      opt.className = 'colorOpt';
-      opt.style.background = c.hex;
-      opt.title = c.hex;
-      opt.addEventListener('click', (ev)=>{
-        ev.stopPropagation();
-        cfg[i].color = c.hex;
-        sw.style.background = c.hex;
-        closeAllColorMenus();
-        saveCfg(cfgStorageKey, cfg);
-        onChanged();
-      });
-      grid.appendChild(opt);
-    }
-
-    menu.appendChild(grid);
-    colorBtn.appendChild(menu);
-
-    colorBtn.addEventListener('click', (ev)=>{
-      ev.stopPropagation();
-      const isOpen = menu.classList.contains('open');
-      closeAllColorMenus();
-      if(!isOpen) menu.classList.add('open');
-    });
-
-    item.appendChild(colorBtn);
-    box.appendChild(item);
-  }
-}
-
-/* ========= drawing ========= */
-function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, yLabelMode){
+function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices){
   const w=canvas.width, h=canvas.height;
   const pad={t:14,b:28,l:12,r:74};
   const chartW=w-pad.l-pad.r;
@@ -721,8 +550,7 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, yL
     const v=maxV-(maxV-minV)*(i/gridSteps);
     ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
     ctx.fillStyle='#9aa1ab'; ctx.textAlign='left';
-    const text = (yLabelMode === "int" ? String(Math.round(v)) : String(Number(v).toFixed(0)));
-    ctx.fillText(text, w-pad.r+6, y+4);
+    ctx.fillText(String(Math.round(v)), w-pad.r+6, y+4);
   }
 
   // x labels
@@ -803,7 +631,7 @@ function showTooltipForCanvas(e, canvas, data){
   tooltip.style.top=ty+'px';
 }
 
-/* ========= interaction (shared) ========= */
+/* ========= interactions (shared) ========= */
 function onWheelZoom(e){
   e.preventDefault();
   if(!globalDates || globalDates.length===0) return;
@@ -812,13 +640,12 @@ function onWheelZoom(e){
   displayCount += (shrink ? -1 : +1);
   displayCount = Math.max(10, Math.min(displayCount, MAX_DISPLAY, globalDates.length));
 
-  offsetX = 0; // zoom always anchor to latest for “まず動く”
+  offsetX = 0;
 
   syncCountControls();
   updateTopChips();
   redrawAll();
 }
-
 function onMouseDown(e, canvas){
   if(!globalDates || globalDates.length===0) return;
   isDragging = true;
@@ -859,148 +686,112 @@ function onMouseLeave(){
   tooltip.style.display='none';
 }
 
-/* ========= controls ========= */
-function syncCountControls(){
-  const r=document.getElementById('countRange');
-  const n=document.getElementById('countNum');
-  r.max=String(MAX_DISPLAY);
-  n.max=String(MAX_DISPLAY);
-  r.value=String(displayCount);
-  n.value=String(displayCount);
-}
-function bindControls(){
-  const countRange=document.getElementById('countRange');
-  const countNum=document.getElementById('countNum');
-
-  const setCount=(v)=>{
-    const nn=Number(v);
-    if(!Number.isFinite(nn)) return;
-    displayCount=Math.max(10, Math.min(Math.round(nn), MAX_DISPLAY, globalDates.length||MAX_DISPLAY));
-    offsetX=0;
-    countRange.value=String(displayCount);
-    countNum.value=String(displayCount);
-    updateTopChips();
-    redrawAll();
-  };
-
-  countRange.addEventListener('input', ()=>setCount(countRange.value));
-  countNum.addEventListener('change', ()=>setCount(countNum.value));
-}
-
 /* ========= redraw ========= */
-let idxAvail = [];
-let tseAvail = [];
-let idxData = null;
-let tseData = null;
-
 function rebuildData(){
-  idxData = buildSeriesOnGlobal(idxRows, idxConfig, globalDates);
-  tseData = buildSeriesOnGlobal(tseRows, tseConfig, globalDates);
+  idxData = { dates: globalDates, series: (idxKey ? [buildOneSeries(idxRows, idxKey, INITIAL_COLORS[0])] : []) };
+  tseData = buildMultiSeries(tseRows, tseKeys);
   renderLegend("idxLegend", idxData);
   renderLegend("tseLegend", tseData);
 }
-
 function redrawAll(){
-  if(!idxCanvas || !tseCanvas) return;
   const { visibleDates, visibleAbsIndices } = getVisibleWindow();
-  drawChartGeneric(idxCtx, idxCanvas, idxData, visibleDates, visibleAbsIndices, "int");
-  drawChartGeneric(tseCtx, tseCanvas, tseData, visibleDates, visibleAbsIndices, "int");
+  drawChartGeneric(idxCtx, idxCanvas, idxData, visibleDates, visibleAbsIndices);
+  drawChartGeneric(tseCtx, tseCanvas, tseData, visibleDates, visibleAbsIndices);
 }
 
-/* ========= sanitize cfg against available list ========= */
-function sanitizeCfg(cfg, availableNames, storageKey){
-  const saved = loadCfg(storageKey);
-  let out = Array.isArray(saved) ? saved : cfg;
-
-  out = out
-    .filter(s => s && typeof s === 'object')
-    .slice(0, MAX_SYMBOLS)
-    .map((s,i)=>({
-      enabled: !!s.enabled,
-      key: (availableNames.includes(s.key) ? s.key : ""),
-      label: (s.label ? String(s.label) : (s.key ? String(s.key) : `項目${i+1}`)),
-      color: paletteHexOrDefault(s.color, INITIAL_COLORS[i] || COLOR_PALETTE[i % COLOR_PALETTE.length].hex),
-      width: (Number.isFinite(Number(s.width)) ? Math.max(1, Math.min(4, Math.round(Number(s.width)))) : 2)
-    }));
-
-  while(out.length < MAX_SYMBOLS){
-    out.push({ enabled:false, key:"", label:`項目${out.length+1}`, color: COLOR_PALETTE[out.length % COLOR_PALETTE.length].hex, width:2 });
+/* ========= select UI ========= */
+function fillSelect(selectEl, names, current){
+  selectEl.innerHTML = "";
+  const optEmpty = document.createElement("option");
+  optEmpty.value = "";
+  optEmpty.textContent = "—";
+  selectEl.appendChild(optEmpty);
+  for(const n of names){
+    const opt = document.createElement("option");
+    opt.value = n;
+    opt.textContent = n;
+    selectEl.appendChild(opt);
   }
+  selectEl.value = current || "";
+}
 
-  // “まず動く”：先頭2スロットが空なら available の先頭を自動採用
-  for(let i=0;i<2;i++){
-    if(!out[i].key && availableNames[i]){
-      out[i].key = availableNames[i];
-      out[i].label = availableNames[i];
-      out[i].enabled = true;
-    }
+function bindSelects(){
+  const idxSel1 = document.getElementById("idxSel1");
+  fillSelect(idxSel1, idxAvail, idxKey);
+  idxSel1.addEventListener("change", ()=>{
+    idxKey = idxSel1.value || "";
+    try{ localStorage.setItem("idxKey_v1", idxKey); }catch(e){}
+    rebuildData(); redrawAll();
+  });
+
+  for(let i=0;i<5;i++){
+    const el = document.getElementById(`tseSel${i+1}`);
+    fillSelect(el, tseAvail, tseKeys[i]);
+    el.addEventListener("change", ()=>{
+      tseKeys[i] = el.value || "";
+      try{ localStorage.setItem("tseKeys_v1", JSON.stringify(tseKeys)); }catch(e){}
+      rebuildData(); redrawAll();
+    });
   }
-
-  saveCfg(storageKey, out);
-  return out;
 }
 
 /* ========= main load ========= */
 async function autoLoad(){
   const statusEl = document.getElementById("status");
 
-  // 1) load PtoCSV.csv
   statusEl.textContent = "PtoCSV.csv 読み込み中…";
   const res1 = await fetch("./PtoCSV.csv", {cache:"no-store"});
   if(!res1.ok) throw new Error(`PtoCSV.csv fetch失敗: ${res1.status} ${res1.statusText}`);
   const txt1 = await res1.text();
   idxRows = parsePtoCsvToLong(txt1);
 
-  // 2) load list.csv (index pull-down source; ONLY list entries)
-  const allIdxNames = Array.from(new Set(idxRows.map(r=>r.name))).sort((a,b)=>String(a).localeCompare(String(b)));
+  statusEl.textContent = "list.csv 読み込み中…";
   const list = await loadNameList("./list.csv");
+  const allIdxNames = uniqSorted(idxRows.map(r=>r.name));
   idxAvail = (list ? list.filter(n => allIdxNames.includes(n)) : []);
-  if(idxAvail.length === 0){
-    // “まず動く”優先：list.csv 不一致でも動かす（ただし要件上は本来 list のみ）
-    idxAvail = allIdxNames;
-  }
+  if(idxAvail.length === 0) idxAvail = allIdxNames; // “まず動く” fallback
 
-  // 3) load TSEPrime.csv
   statusEl.textContent = "TSEPrime.csv 読み込み中…";
   const res2 = await fetch("./data/TSEPrime.csv", {cache:"no-store"});
   if(!res2.ok) throw new Error(`data/TSEPrime.csv fetch失敗: ${res2.status} ${res2.statusText}`);
   const txt2 = await res2.text();
   tseRows = parseTsePrimeToLong(txt2);
 
-  // 4) load bumonlist.csv (tse pull-down source; ONLY list entries)
-  const allTseNames = Array.from(new Set(tseRows.map(r=>r.name))).sort((a,b)=>String(a).localeCompare(String(b)));
+  statusEl.textContent = "bumonlist.csv 読み込み中…";
   const bumon = await loadNameList("./bumonlist.csv");
+  const allTseNames = uniqSorted(tseRows.map(r=>r.name));
   tseAvail = (bumon ? bumon.filter(n => allTseNames.includes(n)) : []);
-  if(tseAvail.length === 0){
-    // “まず動く”優先：bumonlist 不一致でも動かす（ただし要件上は本来 bumonlist のみ）
-    tseAvail = allTseNames;
-  }
+  if(tseAvail.length === 0) tseAvail = allTseNames; // “まず動く” fallback
 
-  // 5) global dates (union) -> shared time axis
   globalDates = buildGlobalDates(idxRows, tseRows);
 
-  // 6) sanitize configs and render pull-downs
-  idxConfig = sanitizeCfg(idxConfig, idxAvail, "cfg_idx_v1");
-  tseConfig = sanitizeCfg(tseConfig, tseAvail, "cfg_tse_v1");
+  // restore last selections
+  try{
+    const k = localStorage.getItem("idxKey_v1");
+    if(k && idxAvail.includes(k)) idxKey = k;
+  }catch(e){}
+  try{
+    const raw = localStorage.getItem("tseKeys_v1");
+    if(raw){
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr) && arr.length===5){
+        tseKeys = arr.map(x => (tseAvail.includes(x) ? x : ""));
+      }
+    }
+  }catch(e){}
 
-  renderSymbolBox("idxSymbolBox", idxAvail, idxConfig, "cfg_idx_v1", ()=>{
-    idxConfig = sanitizeCfg(idxConfig, idxAvail, "cfg_idx_v1");
-    rebuildData();
-    redrawAll();
-  });
-  renderSymbolBox("tseSymbolBox", tseAvail, tseConfig, "cfg_tse_v1", ()=>{
-    tseConfig = sanitizeCfg(tseConfig, tseAvail, "cfg_tse_v1");
-    rebuildData();
-    redrawAll();
-  });
+  // if empty, pick defaults
+  if(!idxKey && idxAvail[0]) idxKey = idxAvail[0];
+  for(let i=0;i<5;i++){
+    if(!tseKeys[i] && tseAvail[i]) tseKeys[i] = tseAvail[i];
+  }
 
-  // 7) initial view
   displayCount = Math.max(10, Math.min(displayCount, MAX_DISPLAY, globalDates.length || displayCount));
   offsetX = 0;
   syncCountControls();
   updateTopChips();
 
-  // 8) build & draw
+  bindSelects();
   rebuildData();
   redrawAll();
 
@@ -1016,9 +807,6 @@ function init(){
   tooltip = document.getElementById("tooltip");
 
   bindControls();
-  document.addEventListener('click', ()=>closeAllColorMenus());
-
-  // sizing
   const doResize = ()=>{
     resizeCanvas(idxCanvas);
     resizeCanvas(tseCanvas);
@@ -1027,7 +815,6 @@ function init(){
   window.addEventListener("resize", doResize);
   doResize();
 
-  // shared interactions on both canvases
   for(const c of [idxCanvas, tseCanvas]){
     c.addEventListener("wheel", onWheelZoom, {passive:false});
     c.addEventListener("mousedown", (e)=>onMouseDown(e, c));
@@ -1041,8 +828,6 @@ function init(){
     c.addEventListener("mouseup", onMouseUp);
     c.addEventListener("mouseleave", onMouseLeave);
   }
-
-  // also catch mouseup outside canvas
   window.addEventListener("mouseup", onMouseUp);
 
   autoLoad().catch(err=>{
