@@ -1,537 +1,385 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>東証プライム売買動向チャート</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TSEPrime 可視化</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <style>
-    :root{
-      --bg:#f5f5f7;
-      --card:#ffffff;
-      --text:#1f2328;
-      --muted:#6b7280;
-      --axisDark:#6b7280;
-      --line:#e5e7eb;
-      --chip:#f3f4f6;
-      --shadow: 0 2px 10px rgba(0,0,0,0.06);
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", sans-serif; margin: 16px; }
+    .controls { display: grid; grid-template-columns: repeat(5, minmax(180px, 1fr)); gap: 10px; margin-bottom: 12px; }
+    .control { display: grid; gap: 6px; }
+    label { font-size: 12px; color: #333; }
+    select { padding: 6px; font-size: 13px; }
+    #chart { border: 1px solid #ddd; border-radius: 8px; padding: 10px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+    .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+    .note { color:#666; font-size:12px; margin-top:8px; }
+    .tooltip {
+      position: fixed; pointer-events: none; background: rgba(255,255,255,0.96);
+      border: 1px solid #ccc; border-radius: 6px; padding: 8px 10px; font-size: 12px;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.12); display: none; max-width: 360px;
+      white-space: nowrap;
     }
-    body{
-      margin:0; padding:16px;
-      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-      background:var(--bg); color:var(--text);
-    }
-    .wrap{ width:100%; margin:0 auto; }
-    .uiWrap{ max-width:1240px; margin:0 auto; }
-    .chartWrap{ width:100%; }
-
-    .card{
-      background:var(--card); border:1px solid var(--line);
-      border-radius:14px; box-shadow:var(--shadow);
-      padding:14px 16px;
-    }
-    .header{
-      display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;
-    }
-    .header h1{ margin:0; font-size:16px; letter-spacing:0.2px; }
-    .sub{ font-size:12px; color:var(--muted); }
-
-    .headerRight{
-      margin-left:auto;
-      display:flex;
-      gap:10px;
-      align-items:center;
-      flex-wrap:wrap;
-      justify-content:flex-end;
-    }
-
-    .rows{ margin-top:10px; display:flex; flex-direction:column; gap:10px; }
-
-    .controls{
-      display:flex; align-items:center; gap:12px; flex-wrap:wrap;
-    }
-    .group{
-      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-      padding:8px 10px;
-      border:1px solid var(--line);
-      background:#fafafa;
-      border-radius:12px;
-    }
-    .label{ font-weight:700; font-size:12px; color:#374151; }
-    .select{
-      min-width:240px;
-      padding:6px 8px;
-      border:1px solid #cfd4dc; border-radius:10px;
-      background:#fff; font-size:13px;
-    }
-    .chip{
-      display:inline-flex; align-items:center; gap:8px;
-      padding:6px 10px;
-      border:1px solid var(--line);
-      background:var(--chip);
-      border-radius:999px;
-      font-size:12px; color:#111827;
-      white-space:nowrap;
-    }
-    .chip .muted{ color:var(--muted); }
-    
-    .legend{ display:flex; gap:16px; flex-wrap:wrap; align-items:center; }
-    .legend-item{ display:flex; align-items:center; gap:6px; font-size:12px; color:#374151; }
-    .swatch{ width:12px; height:12px; border-radius:3px; border:1px solid rgba(0,0,0,0.15); }
-
-    .canvasBox{
-      position:relative;
-      border:1px solid var(--line);
-      border-radius:12px;
-      overflow:hidden;
-      background:#fff;
-    }
-    canvas{ display:block; width:100%; height:520px; cursor:crosshair; }
-
-
-    .tooltip{
-      position:absolute; background:rgba(255,255,255,0.98);
-      border:1px solid #9ca3af; padding:8px 10px; border-radius:10px;
-      font-size:12px; pointer-events:none; display:none;
-      box-shadow:0 8px 22px rgba(0,0,0,0.18);
-      z-index:100; line-height:1.45; white-space:nowrap;
-    }
-
+    .axis text { font-size: 11px; }
+    .grid line { stroke: #eee; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card">
-      <div class="uiWrap">
-      
-      <div class="header">
-          <h1>東証プライム 売買動向チャート</h1>
-          <span class="sub" id="autoStatus">data/TSEPrime.csv を自動読込します</span>
-          <div class="headerRight">
-            <span class="chip" id="latestChip"><span class="muted">最新</span> -</span>
-            <span class="chip" id="rangeChip"><span class="muted">表示範囲</span> -</span>
-          </div>
-        </div>
+  <h2 style="margin: 0 0 10px 0;">TSEPrime（億円表示・最大10系列）</h2>
 
-        <div class="rows">
-          <div class="controls">
-            <div class="group">
-              <div class="label">項目を選択</div>
-              <select id="metricSelect" class="select"></select>
-            </div>
-            <div class="group">
-              <div class="legend" id="legend"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="chartWrap">
-        <div class="canvasBox">
-          <canvas id="mainChart"></canvas>
-        </div>
-      </div>
-    </div>
+  <div class="controls" id="controls"></div>
 
-    <div id="tooltip" class="tooltip"></div>
+  <div id="chart"></div>
+  <div class="legend" id="legend"></div>
+  <div class="note">
+    数値はCSV上「千円」想定で、表示は「億円」（千円 ÷ 100,000）に変換しています。横軸は「公表日」です。
   </div>
 
-<script>
-const COLOR_MAIN = "#005AFF";
-const DATA_URL = "./data/TSEPrime.csv";
-const NON_NUMERIC_KEYS = ["PubDate", "StDate", "EnDate", "Section"];
-const YEN_UNIT = 100000; // 千円単位 -> 億円
+  <div class="tooltip" id="tooltip"></div>
 
-const COLUMN_LABELS = {
-  PubDate: "公表日",
-  StDate: "開始日",
-  EnDate: "終了日",
-  Section: "市場名",
-  PropSell: "自己計_売",
-  PropBuy: "自己計_買",
-  PropTot: "自己計_合計",
-  PropBal: "自己計_差引",
-  BrkSell: "委託計_売",
-  BrkBuy: "委託計_買",
-  BrkTot: "委託計_合計",
-  BrkBal: "委託計_差引",
-  TotSell: "総計_売",
-  TotBuy: "総計_買",
-  TotTot: "総計_合計",
-  TotBal: "総計_差引",
-  IndSell: "個人_売",
-  IndBuy: "個人_買",
-  IndTot: "個人_合計",
-  IndBal: "個人_差引",
-  FrgnSell: "海外投資家_売",
-  FrgnBuy: "海外投資家_買",
-  FrgnTot: "海外投資家_合計",
-  FrgnBal: "海外投資家_差引",
-  SecCoSell: "証券会社_売",
-  SecCoBuy: "証券会社_買",
-  SecCoTot: "証券会社_合計",
-  SecCoBal: "証券会社_差引",
-  InvTrSell: "投資信託_売",
-  InvTrBuy: "投資信託_買",
-  InvTrTot: "投資信託_合計",
-  InvTrBal: "投資信託_差引",
-  BusCoSell: "事業法人_売",
-  BusCoBuy: "事業法人_買",
-  BusCoTot: "事業法人_合計",
-  BusCoBal: "事業法人_差引",
-  OthCoSell: "その他法人_売",
-  OthCoBuy: "その他法人_買",
-  OthCoTot: "その他法人_合計",
-  OthCoBal: "その他法人_差引",
-  InsCoSell: "生保・損保_売",
-  InsCoBuy: "生保・損保_買",
-  InsCoTot: "生保・損保_合計",
-  InsCoBal: "生保・損保_差引",
-  BankSell: "都銀・地銀等_売",
-  BankBuy: "都銀・地銀等_買",
-  BankTot: "都銀・地銀等_合計",
-  BankBal: "都銀・地銀等_差引",
-  TrstBnkSell: "信託銀行_売",
-  TrstBnkBuy: "信託銀行_買",
-  TrstBnkTot: "信託銀行_合計",
-  TrstBnkBal: "信託銀行_差引",
-  OthFinSell: "その他金融機関_売",
-  OthFinBuy: "その他金融機関_買",
-  OthFinTot: "その他金融機関_合計",
-  OthFinBal: "その他金融機関_差引"
-};
+  <script>
+    // -----------------------------
+    // 日本語表示（対応表）
+    // -----------------------------
+    const JP = new Map(Object.entries({
+      PubDate: "公表日",
+      StDate: "開始日",
+      EnDate: "終了日",
+      Section: "市場名",
+      PropSell: "自己計_売",
+      PropBuy: "自己計_買",
+      PropTot: "自己計_合計",
+      PropBal: "自己計_差引",
+      BrkSell: "委託計_売",
+      BrkBuy: "委託計_買",
+      BrkTot: "委託計_合計",
+      BrkBal: "委託計_差引",
+      TotSell: "総計_売",
+      TotBuy: "総計_買",
+      TotTot: "総計_合計",
+      TotBal: "総計_差引",
+      IndSell: "個人_売",
+      IndBuy: "個人_買",
+      IndTot: "個人_合計",
+      IndBal: "個人_差引",
+      FrgnSell: "海外投資家_売",
+      FrgnBuy: "海外投資家_買",
+      FrgnTot: "海外投資家_合計",
+      FrgnBal: "海外投資家_差引",
+      SecCoSell: "証券会社_売",
+      SecCoBuy: "証券会社_買",
+      SecCoTot: "証券会社_合計",
+      SecCoBal: "証券会社_差引",
+      InvTrSell: "投資信託_売",
+      InvTrBuy: "投資信託_買",
+      InvTrTot: "投資信託_合計",
+      InvTrBal: "投資信託_差引",
+      BusCoSell: "事業法人_売",
+      BusCoBuy: "事業法人_買",
+      BusCoTot: "事業法人_合計",
+      BusCoBal: "事業法人_差引",
+      OthCoSell: "その他法人_売",
+      OthCoBuy: "その他法人_買",
+      OthCoTot: "その他法人_合計",
+      OthCoBal: "その他法人_差引",
+      InsCoSell: "生保・損保_売",
+      InsCoBuy: "生保・損保_買",
+      InsCoTot: "生保・損保_合計",
+      InsCoBal: "生保・損保_差引",
+      BankSell: "都銀・地銀等_売",
+      BankBuy: "都銀・地銀等_買",
+      BankTot: "都銀・地銀等_合計",
+      BankBal: "都銀・地銀等_差引",
+      TrstBnkSell: "信託銀行_売",
+      TrstBnkBuy: "信託銀行_買",
+      TrstBnkTot: "信託銀行_合計",
+      TrstBnkBal: "信託銀行_差引",
+      OthFinSell: "その他金融機関_売",
+      OthFinBuy: "その他金融機関_買",
+      OthFinTot: "その他金融機関_合計",
+      OthFinBal: "その他金融機関_差引"
+    }));
 
-let rows = [];
-let availableKeys = [];
-let selectedKey = null;
+    const isNumericSeriesKey = (k) => !["PubDate","StDate","EnDate","Section"].includes(k);
 
-let mainCanvas, mainCtx, tooltip;
-let backBuffer = null;
-
-function resetBackBuffer(){ backBuffer = null; }
-function saveBackBuffer(){ try{ backBuffer = mainCtx.getImageData(0,0,mainCanvas.width, mainCanvas.height); }catch(e){} }
-function restoreBackBuffer(){ try{ if(backBuffer) mainCtx.putImageData(backBuffer,0,0); }catch(e){} }
-
-function toNum(s){
-  if(s==null) return NaN;
-  return Number(String(s).replace(/,/g,'').replace(/"/g,'').trim());
-}
-function parseDelimitedLine(line, delim){
-  const out=[]; let cur=""; let inQ=false;
-  for(const ch of line){
-    if(ch==='"'){ inQ=!inQ; continue; }
-    if(ch===delim && !inQ){ out.push(cur); cur=""; }
-    else cur+=ch;
-  }
-  out.push(cur);
-  return out;
-}
-function detectDelimiter(headerLine){
-  const tabCount=(headerLine.match(/\t/g)||[]).length;
-  const commaCount=(headerLine.match(/,/g)||[]).length;
-  return tabCount>=commaCount ? "\t" : ",";
-}
-
-function parseCsv(text){
-  const lines = text.trim().split(/\r?\n/);
-  if(lines.length < 2) throw new Error("データが空です");
-  const delim = detectDelimiter(lines[0]);
-  const header = parseDelimitedLine(lines[0], delim).map(s => s.replace(/\r/g,'').trim());
-
-
-  if(!header.includes("PubDate")) throw new Error("PubDate 列が見つかりません");
-
-      if(!row.PubDate) continue;
-      dataRows.push(row);
-    }
-  
-  
-    item.appendChild(colorBtn);
-    box.appendChild(item);
-  }
-}
-function buildPerf(rows, lookback, symbols){
-  const active = (symbols || []).filter(s => s && s.key);
-  if(active.length === 0){
-    return { dates: [], series: [], baseIndex: null, baseDate: null, latestDate: null, lookback };
-  }
-
-  const mapByName = new Map();
-  for(const s of active) mapByName.set(s.key, new Map());
-
-  for(const r of rows){
-    if(!mapByName.has(r.name)) continue;
-    mapByName.get(r.name).set(r.date, r.value);
-  }
-  return { header, dataRows };
-}
-
-function buildSeries(key){
-  return rows.map(row => {
-    const raw = toNum(row[key]);
-    if(Number.isNaN(raw)) return null;
-    return raw / YEN_UNIT;
-  });
-}
-
-function getDateList(){
-  return rows.map(row => row.PubDate);
-}
-
-function updateChips(dates){
-  const latestEl = document.getElementById('latestChip');
-  const rangeEl = document.getElementById('rangeChip');
-  if(!dates.length){
-    latestEl.innerHTML = '<span class="muted">最新</span> -';
-    rangeEl.innerHTML = '<span class="muted">表示範囲</span> -';
-    return;
-  }
-  
-}
-function syncCountControls(){
-  const r=document.getElementById('countRange');
-  const n=document.getElementById('countNum');
-  r.max=String(MAX_DISPLAY);
-  n.max=String(MAX_DISPLAY);
-  r.value=String(displayCount);
-  n.value=String(displayCount);
-  latestEl.innerHTML = `<span class="muted">最新</span> ${dates[dates.length-1]}`;
-  rangeEl.innerHTML = `<span class="muted">表示範囲</span> ${dates[0]} ~ ${dates[dates.length-1]}`;
-}
-
-
-function renderLegend(label){
-  const box = document.getElementById('legend');
-  if(!box) return;
-  box.innerHTML = '';
-  if(!label) return;
-  const item = document.createElement('div');
-  item.className = 'legend-item';
-  const sw = document.createElement('span');
-  sw.className = 'swatch';
-  sw.style.background = COLOR_MAIN;
-  item.appendChild(sw);
-  const txt = document.createElement('span');
-  txt.textContent = label;
-  item.appendChild(txt);
-  box.appendChild(item);
-}
-
-function formatValue(value){
-  if(value == null || Number.isNaN(value)) return '-';
-  return value.toLocaleString('ja-JP', { maximumFractionDigits: 1 });
-}
-
-function drawChart(){
-  if(!mainCanvas) return;
-
-  const dates = getDateList();
-  if(!selectedKey || dates.length === 0){
-    resetBackBuffer();
-    mainCtx.clearRect(0,0,mainCanvas.width, mainCanvas.height);
-    mainCtx.fillStyle='#6b7280';
-    mainCtx.textAlign='center';
-    mainCtx.fillText("No Data", mainCanvas.width/2, mainCanvas.height/2);
-    return;
-  }
-
-  const values = buildSeries(selectedKey);
-  const w = mainCanvas.width;
-  const h = mainCanvas.height;
-  const pad = {t:18,b:32,l:12,r:70};
-  const chartW = w - pad.l - pad.r;
-  const chartH = h - pad.t - pad.b;
-
-  mainCtx.clearRect(0,0,w,h);
-
-  let minV = Infinity;
-  let maxV = -Infinity;
-  values.forEach(v => {
-    if(v == null || Number.isNaN(v)) return;
-    minV = Math.min(minV, v);
-    maxV = Math.max(maxV, v);
-  });
-
-
-  if(minV === Infinity){
-    mainCtx.fillStyle='#6b7280';
-    mainCtx.textAlign='center';
-    mainCtx.fillText("No Data", w/2, h/2);
-    return;
-  }
-  
-  const range = (maxV - minV) || 1;
-  minV -= range * 0.06;
-  maxV += range * 0.06;
-
-  const scaleY = chartH / (maxV - minV);
-  const getX = (i) => pad.l + (i + 0.5) * (chartW / dates.length);
-  const getY = (val) => pad.t + chartH - (val - minV) * scaleY;
-
-  mainCtx.strokeStyle = '#eef0f3';
-  mainCtx.lineWidth = 1;
-  const gridSteps = 5;
-  for(let i=0;i<=gridSteps;i++){
-    const y = pad.t + (chartH * i / gridSteps);
-    const v = maxV - (maxV - minV) * (i / gridSteps);
-    mainCtx.beginPath();
-    mainCtx.moveTo(pad.l, y);
-    mainCtx.lineTo(w - pad.r, y);
-    mainCtx.stroke();
-    mainCtx.fillStyle = '#9aa1ab';
-    mainCtx.textAlign = 'left';
-    mainCtx.fillText(formatValue(v), w - pad.r + 6, y + 4);
+    // -----------------------------
+    // 日付パース（複数フォーマットに対応）
+    // -----------------------------
+    const parsers = [
+      d3.timeParse("%Y-%m-%d"),
+      d3.timeParse("%Y/%m/%d"),
+      d3.timeParse("%Y%m%d"),
+      d3.timeParse("%Y-%m-%d %H:%M:%S"),
+      d3.timeParse("%Y/%m/%d %H:%M:%S"),
+    ];
+    function parseDateAny(s) {
+      if (!s) return null;
+      const t = String(s).trim();
+      for (const p of parsers) {
+        const d = p(t);
+        if (d) return d;
+      }
+      // 最後の手段：Dateに投げる（環境依存）
+      const d = new Date(t);
+      return isNaN(+d) ? null : d;
     }
 
+    // -----------------------------
+    // 表示変換：千円 -> 億円
+    // 1億円 = 100,000千円
+    // -----------------------------
+    const toOkuYen = (thousandYen) => thousandYen / 100000;
 
-  mainCtx.fillStyle = '#6b7280';
-  mainCtx.textAlign = 'left';
-  mainCtx.fillText('億円', w - pad.r + 6, pad.t - 4);
+    // -----------------------------
+    // Chart setup
+    // -----------------------------
+    const chartEl = document.getElementById("chart");
+    const legendEl = document.getElementById("legend");
+    const controlsEl = document.getElementById("controls");
+    const tooltip = document.getElementById("tooltip");
 
-  dates.forEach((d, i)=>{
-    if(d && i % Math.ceil(dates.length/6)===0){
-      mainCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--axisDark').trim() || '#6b7280';
-      mainCtx.textAlign='center';
-      mainCtx.fillText(d, getX(i), h-6);
+    const margin = { top: 18, right: 30, bottom: 40, left: 70 };
+    const width = 1100;
+    const height = 520;
+
+    const svg = d3.select(chartEl).append("svg")
+      .attr("viewBox", `0 0 ${width} ${height}`)
+      .attr("width", "100%")
+      .attr("height", "auto");
+
+    const plotW = width - margin.left - margin.right;
+    const plotH = height - margin.top - margin.bottom;
+
+    const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const x = d3.scaleTime().range([0, plotW]);
+    const y = d3.scaleLinear().range([plotH, 0]);
+
+    const xAxisG = g.append("g").attr("transform", `translate(0,${plotH})`).attr("class","axis");
+    const yAxisG = g.append("g").attr("class","axis");
+
+    const gridG = g.append("g").attr("class","grid");
+    const linesG = g.append("g");
+    const dotsG = g.append("g");
+
+    g.append("text")
+      .attr("x", plotW)
+      .attr("y", plotH + 34)
+      .attr("text-anchor", "end")
+      .attr("font-size", 12)
+      .text("公表日");
+
+    g.append("text")
+      .attr("x", -10)
+      .attr("y", -6)
+      .attr("text-anchor", "end")
+      .attr("font-size", 12)
+      .text("億円");
+
+    // 色（10系列前提だが、念のため余裕）
+    const color = (i) => {
+      const base = d3.schemeTableau10;
+      if (i < base.length) return base[i];
+      return d3.interpolateRainbow(i / 20);
+    };
+
+    // -----------------------------
+    // UI: 10 dropdowns
+    // -----------------------------
+    const SERIES_SLOTS = 10;
+    const selections = Array.from({ length: SERIES_SLOTS }, () => "");
+
+    function renderControls(seriesKeys) {
+      controlsEl.innerHTML = "";
+      for (let i = 0; i < SERIES_SLOTS; i++) {
+        const div = document.createElement("div");
+        div.className = "control";
+
+        const label = document.createElement("label");
+        label.textContent = `表示項目 ${i + 1}`;
+        div.appendChild(label);
+
+        const sel = document.createElement("select");
+        sel.dataset.idx = String(i);
+
+        // 空（非表示）
+        const optEmpty = document.createElement("option");
+        optEmpty.value = "";
+        optEmpty.textContent = "（なし）";
+        sel.appendChild(optEmpty);
+
+        for (const k of seriesKeys) {
+          const opt = document.createElement("option");
+          opt.value = k;
+          opt.textContent = JP.get(k) ?? k;
+          sel.appendChild(opt);
+        }
+
+        sel.value = selections[i] || "";
+        sel.addEventListener("change", (e) => {
+          const idx = +e.target.dataset.idx;
+          selections[idx] = e.target.value;
+          updateChart();
+        });
+
+        div.appendChild(sel);
+        controlsEl.appendChild(div);
+      }
     }
-  });
 
-  mainCanvas.pointPositions = dates.map((d,i)=>({
-    x: getX(i),
-    w: chartW / dates.length,
-    index: i,
-    date: d
-  }));
+    // -----------------------------
+    // Data load
+    // -----------------------------
+    let raw = [];
+    let seriesKeys = [];
 
-  mainCtx.strokeStyle = COLOR_MAIN;
-  mainCtx.lineWidth = 2;
-  mainCtx.beginPath();
-  let moved = false;
-  values.forEach((v, i)=>{
-    if(v == null || Number.isNaN(v)) { moved = false; return; }
-    const x = getX(i);
-    const y = getY(v);
-    if(!moved){ mainCtx.moveTo(x, y); moved = true; }
-    else mainCtx.lineTo(x, y);
-  });
-  mainCtx.stroke();
-  mainCtx.restore();
-}
+    d3.csv("data/TSEPrime.csv").then(rows => {
+      // 必須：PubDate
+      raw = rows.map(r => {
+        const d = parseDateAny(r.PubDate);
+        const out = { ...r, __date: d };
+        // 数値列は number に変換（カンマ除去も）
+        for (const k of Object.keys(r)) {
+          if (!isNumericSeriesKey(k)) continue;
+          const v = String(r[k] ?? "").replace(/,/g, "").trim();
+          out[k] = v === "" ? null : +v;
+        }
+        return out;
+      }).filter(r => r.__date);
 
+      raw.sort((a,b) => a.__date - b.__date);
 
-function drawCrosshair(x){
-  restoreBackBuffer();
-  if(x < 0) return;
-  mainCtx.save();
-  mainCtx.strokeStyle = '#9aa1ab';
-  mainCtx.setLineDash([3,3]);
-  mainCtx.beginPath();
-  mainCtx.moveTo(x, 0);
-  mainCtx.lineTo(x, mainCanvas.height);
-  mainCtx.stroke();
-  mainCtx.restore();
-}
+      // series keys
+      const allKeys = Object.keys(rows[0] ?? {});
+      seriesKeys = allKeys.filter(isNumericSeriesKey);
 
-function handleTooltip(e){
-  const pps = mainCanvas.pointPositions;
-  if(!pps || !selectedKey) return;
+      renderControls(seriesKeys);
 
-  const rect = mainCanvas.getBoundingClientRect();
-  const mouseX = e.clientX - rect.left;
+      // 初期選択：先頭から最大10
+      for (let i = 0; i < SERIES_SLOTS; i++) {
+        selections[i] = seriesKeys[i] ?? "";
+      }
+      // コントロールに反映
+      [...controlsEl.querySelectorAll("select")].forEach((s, i) => s.value = selections[i] || "");
 
-  const p = pps.find(pp => mouseX >= pp.x - pp.w/2 && mouseX <= pp.x + pp.w/2);
-  if(!p){
-    tooltip.style.display = 'none';
-    drawCrosshair(-1);
-    return;
-  }
+      updateChart();
+    }).catch(err => {
+      chartEl.innerHTML = `<div style="color:#b00;">CSVの読み込みに失敗しました: ${String(err)}</div>`;
+      console.error(err);
+    });
 
-  drawCrosshair(p.x);
+    // -----------------------------
+    // Chart update
+    // -----------------------------
+    function updateChart() {
+      const picked = selections.filter(k => k && seriesKeys.includes(k));
+      // 重複排除（同じ項目を複数選ぶと見分けがつかないため）
+      const uniq = [];
+      for (const k of picked) if (!uniq.includes(k)) uniq.push(k);
 
-  const values = buildSeries(selectedKey);
-  const value = values[p.index];
-  const label = COLUMN_LABELS[selectedKey] || selectedKey;
+      // x domain
+      x.domain(d3.extent(raw, d => d.__date));
 
-  tooltip.innerHTML = `<strong>${p.date}</strong><br>${label}: ${formatValue(value)} 億円`;
-  tooltip.style.display = 'block';
-  
-  let tx = e.clientX + 14;
-  let ty = e.clientY + 14;
-  if(tx + 230 > window.innerWidth) tx -= 250;
-  tooltip.style.left = tx + 'px';
-  tooltip.style.top = ty + 'px';
-}
+      // y domain: 選択系列の min/max（億円換算後）
+      let yMin = Infinity, yMax = -Infinity;
+      for (const k of uniq) {
+        for (const row of raw) {
+          const v = row[k];
+          if (v == null || isNaN(v)) continue;
+          const oku = toOkuYen(v);
+          if (oku < yMin) yMin = oku;
+          if (oku > yMax) yMax = oku;
+        }
+      }
+      if (!isFinite(yMin) || !isFinite(yMax)) { yMin = -1; yMax = 1; }
+      // 少し余白
+      const pad = (yMax - yMin) * 0.08 || 1;
+      y.domain([yMin - pad, yMax + pad]).nice();
 
+      // axes
+      const xAxis = d3.axisBottom(x).ticks(10);
+      const yAxis = d3.axisLeft(y).ticks(8).tickFormat(d => `${d3.format(",.2f")(d)}`);
 
-function onMouseLeave(){
-  tooltip.style.display = 'none';
-  drawCrosshair(-1);
-}
+      xAxisG.call(xAxis);
+      yAxisG.call(yAxis);
 
-function bindSelect(){
-  const select = document.getElementById('metricSelect');
-  select.innerHTML = '';
-  availableKeys.forEach(key => {
-    const opt = document.createElement('option');
-    opt.value = key;
-    opt.textContent = COLUMN_LABELS[key] || key;
-    select.appendChild(opt);
-  });
-  select.value = selectedKey || availableKeys[0] || '';
-  select.addEventListener('change', () => {
-    selectedKey = select.value;
-    renderLegend(COLUMN_LABELS[selectedKey] || selectedKey);
-    drawChart();
-  });
-}
+      // grid
+      gridG.selectAll("*").remove();
+      gridG.call(d3.axisLeft(y).ticks(8).tickSize(-plotW).tickFormat(""))
+        .selectAll("line");
+      gridG.selectAll("path").remove();
 
+      // line generator
+      const line = d3.line()
+        .defined(d => d.v != null && !isNaN(d.v))
+        .x(d => x(d.date))
+        .y(d => y(d.oku));
 
-async function autoLoad(){
-  const el = document.getElementById('autoStatus');
-  try{
-    el.textContent = 'data/TSEPrime.csv を読み込み中...';
-    const res = await fetch(DATA_URL, {cache:'no-store'});
-    if(!res.ok) throw new Error(`fetch失敗: ${res.status} ${res.statusText}`);
-    const text = await res.text();
-    const parsed = parseCsv(text);
-    rows = parsed.dataRows;
-    availableKeys = parsed.header.filter(key => !NON_NUMERIC_KEYS.includes(key));
-    selectedKey = availableKeys[0] || null;
-    
+      // build series
+      const series = uniq.map((k, i) => {
+        const values = raw.map(r => ({
+          key: k,
+          label: JP.get(k) ?? k,
+          date: r.__date,
+          v: r[k],
+          oku: (r[k] == null || isNaN(r[k])) ? null : toOkuYen(r[k])
+        }));
+        return { key: k, label: JP.get(k) ?? k, i, values };
+      });
 
-    el.textContent = `ロード完了: ${rows.length.toLocaleString()}行`;
+      // render lines
+      const paths = linesG.selectAll("path").data(series, d => d.key);
+      paths.enter().append("path")
+        .attr("fill", "none")
+        .attr("stroke-width", 2)
+        .attr("stroke", d => color(d.i))
+        .merge(paths)
+        .attr("stroke", d => color(d.i))
+        .attr("d", d => line(d.values));
+      paths.exit().remove();
 
-    bindSelect();
-    updateChips(getDateList());
-    renderLegend(COLUMN_LABELS[selectedKey] || selectedKey);
-    drawChart();
-  }catch(e){
-    console.error(e);
-    el.textContent = `自動読込エラー: ${e.message}`;
-  }
-}
+      // dots (hover)
+      const flat = series.flatMap(s => s.values.filter(v => v.oku != null).map(v => ({...v, si: s.i})));
+      const dots = dotsG.selectAll("circle").data(flat, d => `${d.key}_${+d.date}`);
+      dots.enter().append("circle")
+        .attr("r", 2.6)
+        .attr("fill", d => color(d.si))
+        .attr("cx", d => x(d.date))
+        .attr("cy", d => y(d.oku))
+        .on("mouseenter", (evt, d) => {
+          tooltip.style.display = "block";
+          tooltip.textContent = `${d3.timeFormat("%Y-%m-%d")(d.date)}  ${JP.get(d.key) ?? d.key}: ${d3.format(",.2f")(d.oku)} 億円`;
+        })
+        .on("mousemove", (evt) => {
+          tooltip.style.left = (evt.clientX + 12) + "px";
+          tooltip.style.top = (evt.clientY + 12) + "px";
+        })
+        .on("mouseleave", () => {
+          tooltip.style.display = "none";
+        })
+        .merge(dots)
+        .attr("fill", d => color(d.si))
+        .attr("cx", d => x(d.date))
+        .attr("cy", d => y(d.oku));
+      dots.exit().remove();
 
-function resizeCanvas(){
-  resetBackBuffer();
-  const rect = mainCanvas.getBoundingClientRect();
-  mainCanvas.width = Math.floor(rect.width);
-  mainCanvas.height = Math.floor(rect.height);
-  drawChart();
-}
-
-function init(){
-  mainCanvas = document.getElementById('mainChart');
-  mainCtx = mainCanvas.getContext('2d');
-  tooltip = document.getElementById('tooltip');
-
-  mainCanvas.addEventListener('mousemove', handleTooltip);
-  mainCanvas.addEventListener('mouseleave', onMouseLeave);
-  window.addEventListener('resize', resizeCanvas);
-
-  resizeCanvas();
-  autoLoad();
-}
-
-window.addEventListener('DOMContentLoaded', init);
-</script>
+      // legend
+      legendEl.innerHTML = "";
+      for (const s of series) {
+        const item = document.createElement("div");
+        item.className = "legend-item";
+        const sw = document.createElement("span");
+        sw.className = "swatch";
+        sw.style.background = color(s.i);
+        const tx = document.createElement("span");
+        tx.textContent = s.label;
+        item.appendChild(sw);
+        item.appendChild(tx);
+        legendEl.appendChild(item);
+      }
+    }
+  </script>
 </body>
 </html>
