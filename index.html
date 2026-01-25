@@ -1167,7 +1167,9 @@ async function autoLoad(){
     const allNames = getAvailableNames(longRows);
     const listOrder = await loadListCsv(allNames);
 
-    availableNames = (listOrder ? listOrder.filter(n => allNames.includes(n)) : allNames);
+    const filtered = (listOrder ? listOrder.filter(n => allNames.includes(n)) : allNames);
+    availableNames = (filtered && filtered.length > 0) ? filtered : allNames;
+
 
     sanitizeSymbolConfig(availableNames);
     renderSymbolConfigUI();
