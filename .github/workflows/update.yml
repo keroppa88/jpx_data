@@ -14,9 +14,9 @@ jobs:
         with:
           node-version: '20'
       
-      # 株価データ更新
+      # 投資部門別売買状況データ更新
       - name: Update Stock Data
-        run: node updata_sankasha.js
+        run: node updata_bumon.js
         env:
           JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
 
