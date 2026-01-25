@@ -1,0 +1,38 @@
+name: Daily Update
+on:
+  schedule:
+  - cron: '30 9 * * 1,2,4,5'  # JST 18:30（UTC 09:30）月火木金
+workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      # 株価データ更新
+      - name: Update Stock Data
+        run: node update_daily.js
+        env:
+          JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
+
+     
+      # 財務情報更新
+      - name: Update Finance Data
+        run: node update_f_daily.js
+        env:
+          JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
+
+      # コミット＆プッシュ
+      - name: Commit and Push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/*.csv financedata/*.csv
+          git diff --cached --name-only
+          git commit -m "Update $(date +'%Y-%m-%d')" || exit 0
+          git push
