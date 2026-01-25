@@ -739,18 +739,7 @@ function bindSelects(){
 async function autoLoad(){
   const statusEl = document.getElementById("status");
 
-  // 2) 指数データ（固定: ./PtoCSV_long.csv）
-  idxRows = [];
-  try{
-    statusEl.textContent = "PtoCSV_long.csv 読み込み中…";
-    const res1 = await fetch("./PtoCSV_long.csv", {cache:"no-store"});
-    if(!res1.ok) throw new Error(`PtoCSV_long.csv fetch失敗: ${res1.status} ${res1.statusText}`);
-    const txt1 = await res1.text();
-    idxRows = parsePtoCsvToLong(txt1); // long形式ならこのパーサでOK
-  }catch(e){
-    console.warn(e);
-    statusEl.textContent = `PtoCSV_long.csv 読込エラー: ${e.message}`;
-  }
+
   // 2) 指数データ（固定: ./PtoCSV_long.csv）
   idxRows = [];
   try{
@@ -764,6 +753,19 @@ async function autoLoad(){
     statusEl.textContent = `PtoCSV_long.csv 読込エラー: ${e.message}`;
   }
 
+  // 3) 部門別データ（固定: ./data/TSEPrime.csv）
+  tseRows = [];
+  try{
+    statusEl.textContent += " / TSEPrime.csv 読み込み中…";
+    const res2 = await fetch("./data/TSEPrime.csv", {cache:"no-store"});
+    if(!res2.ok) throw new Error(`data/TSEPrime.csv fetch失敗: ${res2.status} ${res2.statusText}`);
+    const txt2 = await res2.text();
+    tseRows = parseTsePrimeToLong(txt2);
+  }catch(e){
+    console.warn(e);
+    statusEl.textContent += ` / TSEPrime 読込エラー: ${e.message}`;
+  }
+  
   // restore last selections
   try{
     const k = localStorage.getItem("idxKey_v1");
