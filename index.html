@@ -234,6 +234,8 @@ const TSEPRIME_FIELD_MAP = {
 /* ========= state ========= */
 let idxRows = [];   // {date,name,value}
 let tseRows = [];   // {date,name,value}
+let idxDates = [];
+let tseDates = [];
 let globalDates = [];
 
 let displayCount = 200;
@@ -281,10 +283,9 @@ function uniqSorted(arr){
   out.sort((a,b)=>String(a).localeCompare(String(b)));
   return out;
 }
-function buildGlobalDates(idxRows, tseRows){
+function buildDateList(rows){
   const set = new Set();
-  for(const r of idxRows){ if(r && r.date) set.add(r.date); }
-  for(const r of tseRows){ if(r && r.date) set.add(r.date); }
+  for(const r of rows){ if(r && r.date) set.add(r.date); }
   const arr = Array.from(set);
   arr.sort((a,b)=>{
     const ta=new Date(a).getTime(), tb=new Date(b).getTime();
@@ -293,24 +294,23 @@ function buildGlobalDates(idxRows, tseRows){
   });
   return arr;
 }
-function clampView(){
-  const n = globalDates.length;
-  displayCount = Math.max(10, Math.min(displayCount, MAX_DISPLAY, n || 10));
-  const maxOffset = Math.max(0, n - displayCount);
-  offsetX = Math.max(0, Math.min(Math.round(offsetX), maxOffset));
+function buildGlobalDates(idxRows, tseRows){
+  return buildDateList(idxRows.concat(tseRows));
 }
-function getVisibleWindow(){
-  clampView();
-  const n = globalDates.length;
-  const startRaw = n - displayCount - offsetX;
-  const endRaw = startRaw + displayCount;
+function getVisibleWindowForDates(dates){
+  const n = dates.length;
+  const count = Math.max(10, Math.min(displayCount, MAX_DISPLAY, n || 10));
+  const maxOffset = Math.max(0, n - count);
+  const localOffset = Math.max(0, Math.min(Math.round(offsetX), maxOffset));
+  const startRaw = n - count - localOffset;
+  const endRaw = startRaw + count;
   const start = Math.max(0, startRaw);
   const end = Math.min(n, endRaw);
 
-  const realDates = (start < end) ? globalDates.slice(start, end) : [];
+  const realDates = (start < end) ? dates.slice(start, end) : [];
   const realLen = realDates.length;
 
-  const padN = displayCount - realLen;
+  const padN = count - realLen;
   const pads = new Array(Math.max(0,padN)).fill("");
 
   const visibleDates = pads.concat(realDates);
@@ -329,7 +329,7 @@ function updateTopChips(){
   }
   latestEl.innerHTML = `<span class="muted">最新</span> ${globalDates[globalDates.length-1]}`;
 
-  const { visibleDates } = getVisibleWindow();
+  const { visibleDates } = getVisibleWindowForDates(globalDates);
   let startDate=null, endDate=null;
   for(let i=0;i<visibleDates.length;i++){ if(visibleDates[i]){ startDate=visibleDates[i]; break; } }
   for(let i=visibleDates.length-1;i>=0;i--){ if(visibleDates[i]){ endDate=visibleDates[i]; break; } }
@@ -478,20 +478,20 @@ async function loadNameList(filename){
 }
 
 /* ========= series building ========= */
-function buildOneSeries(rows, key, color){
+function buildOneSeries(rows, key, color, dates){
   const map = new Map();
   for(const r of rows){ if(r.name===key) map.set(r.date, r.value); }
-  const values = globalDates.map(d => (map.has(d) ? map.get(d) : null));
+  const values = dates.map(d => (map.has(d) ? map.get(d) : null));
   return { label: key, color, width: 2, values };
 }
-function buildMultiSeries(rows, keys){
+function buildMultiSeries(rows, keys, dates){
   const series = [];
   for(let i=0;i<keys.length;i++){
     const k = keys[i];
     if(!k) continue;
-    series.push(buildOneSeries(rows, k, INITIAL_COLORS[i] || COLOR_PALETTE[i % COLOR_PALETTE.length].hex));
+    series.push(buildOneSeries(rows, k, INITIAL_COLORS[i] || COLOR_PALETTE[i % COLOR_PALETTE.length].hex, dates));
   }
-  return { dates: globalDates, series };
+  return { dates, series };
 }
 
 /* ========= draw ========= */
@@ -628,7 +628,7 @@ function showTooltipForCanvas(e, canvas, data){
     return;
   }
 
-  const date = globalDates[absIdx] || p.date || "";
+  const date = data.dates[absIdx] || p.date || "";
   let html = `<strong>${date}</strong><br>`;
   for(const s of data.series){
     html += `<span style="color:${s.color}; font-weight:700;">${s.label}</span>: ${fmt(s.values[absIdx])}<br>`;
@@ -699,15 +699,16 @@ function onMouseLeave(){
 
 /* ========= redraw ========= */
 function rebuildData(){
-  idxData = { dates: globalDates, series: (idxKey ? [buildOneSeries(idxRows, idxKey, INITIAL_COLORS[0])] : []) };
-  tseData = buildMultiSeries(tseRows, tseKeys);
+  idxData = { dates: idxDates, series: (idxKey ? [buildOneSeries(idxRows, idxKey, INITIAL_COLORS[0], idxDates)] : []) };
+  tseData = buildMultiSeries(tseRows, tseKeys, tseDates);
   renderLegend("idxLegend", idxData);
   renderLegend("tseLegend", tseData);
 }
 function redrawAll(){
-  const { visibleDates, visibleAbsIndices } = getVisibleWindow();
-  drawChartGeneric(idxCtx, idxCanvas, idxData, visibleDates, visibleAbsIndices);
-  drawChartGeneric(tseCtx, tseCanvas, tseData, visibleDates, visibleAbsIndices);
+  const idxWindow = getVisibleWindowForDates(idxDates);
+  const tseWindow = getVisibleWindowForDates(tseDates);
+  drawChartGeneric(idxCtx, idxCanvas, idxData, idxWindow.visibleDates, idxWindow.visibleAbsIndices);
+  drawChartGeneric(tseCtx, tseCanvas, tseData, tseWindow.visibleDates, tseWindow.visibleAbsIndices);
 }
 
 /* ========= select UI ========= */
@@ -800,7 +801,9 @@ async function autoLoad(){
   tseAvail = (tseList ? tseList.filter(n => tseNamesFromData.includes(n)) : tseNamesFromData);
   if(tseAvail.length === 0) tseAvail = tseNamesFromData;
 
-  // 5) 共有日付軸
+  // 5) 日付軸
+  idxDates = buildDateList(idxRows);
+  tseDates = buildDateList(tseRows);
   globalDates = buildGlobalDates(idxRows, tseRows);
   
   // restore last selections
