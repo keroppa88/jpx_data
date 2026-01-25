@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>相対比較チャート</title>
+  <style>
+    :root{
+      --bg:#f5f5f7;
+      --card:#ffffff;
+      --text:#1f2328;
+      --muted:#6b7280;
+      --axisDark:#6b7280; /* 濃いグレー（軸ラベル/100） */
+      --line:#e5e7eb;
+      --chip:#f3f4f6;
+      --shadow: 0 2px 10px rgba(0,0,0,0.06);
+      --baseRed:#cc4a59; /* 彩度を抑えた赤 */
+    }
+    body{
+      margin:0; padding:16px;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:var(--bg); color:var(--text);
+    }
+    .wrap{ width:100%; margin:0 auto; }
+    .uiWrap{ max-width:1240px; margin:0 auto; }
+    .chartWrap{ width:100%; }
+
+    .card{
+      background:var(--card); border:1px solid var(--line);
+      border-radius:14px; box-shadow:var(--shadow);
+      padding:14px 16px;
+    }
+    .header{
+      display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;
+    }
+    .header h1{ margin:0; font-size:16px; letter-spacing:0.2px; }
+    .sub{ font-size:12px; color:var(--muted); }
+
+    .headerRight{
+      margin-left:auto;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+
+    .rows{ margin-top:10px; display:flex; flex-direction:column; gap:10px; }
+
+    .controls{
+      display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    }
+    .group{
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+      padding:8px 10px;
+      border:1px solid var(--line);
+      background:#fafafa;
+      border-radius:12px;
+    }
+    .label{ font-weight:700; font-size:12px; color:#374151; }
+    input[type="range"]{ width:260px; }
+    input[type="number"]{
+      width:86px; padding:6px 8px;
+      border:1px solid #cfd4dc; border-radius:10px;
+      background:#fff; font-size:13px; text-align:center;
+    }
+    .chip{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:6px 10px;
+      border:1px solid var(--line);
+      background:var(--chip);
+      border-radius:999px;
+      font-size:12px; color:#111827;
+      white-space:nowrap;
+    }
+    .chip .muted{ color:var(--muted); }
+    .chip.big{ font-size:14px; font-weight:700; } /* 起点日を約1.5倍 */
+    .check{
+      display:flex; align-items:center; gap:6px;
+      font-size:12px; color:#374151;
+    }
+
+    .legend{ display:flex; gap:16px; flex-wrap:wrap; align-items:center; }
+    .legend-item{ display:flex; align-items:center; gap:6px; font-size:12px; color:#374151; }
+    .swatch{ width:12px; height:12px; border-radius:3px; border:1px solid rgba(0,0,0,0.15); }
+
+    .canvasBox{
+      position:relative;
+      border:1px solid var(--line);
+      border-radius:12px;
+      overflow:hidden;
+      background:#fff;
+    }
+    canvas{ display:block; width:100%; height:520px; cursor:crosshair; }
+
+    .hintRow{
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+      color:var(--muted); font-size:12px;
+    }
+    .hintRow .right{ margin-left:auto; }
+
+    .tooltip{
+      position:absolute; background:rgba(255,255,255,0.98);
+      border:1px solid #9ca3af; padding:8px 10px; border-radius:10px;
+      font-size:12px; pointer-events:none; display:none;
+      box-shadow:0 8px 22px rgba(0,0,0,0.18);
+      z-index:100; line-height:1.45; white-space:nowrap;
+    }
+    .symbox{
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap:10px 12px;
+      margin-top:6px;
+      width:100%;
+    }
+    .symitem{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      border:1px solid var(--line);
+      background:#fafafa;
+      border-radius:12px;
+      min-width:0;
+    }
+    .symitem .slot{ width:18px; text-align:right; font-size:12px; color:var(--muted); flex:0 0 auto; }
+    .symitem .nameSel{
+      width:150px; /* 約4割減（従来想定 250px → 150px） */
+      min-width:0;
+      padding:6px 8px;
+      border:1px solid #cfd4dc; border-radius:10px;
+      background:#fff; font-size:13px;
+      flex:1 1 auto;
+    }
+    .symitem .colorBtn{
+      width:34px; height:28px;
+      border:1px solid #cfd4dc; border-radius:10px;
+      background:#fff;
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer;
+      flex:0 0 auto;
+      position:relative;
+    }
+    .symitem .colorSwatch{
+      width:16px; height:16px; border-radius:4px;
+      border:1px solid rgba(0,0,0,0.18);
+      display:inline-block;
+    }
+    .colorMenu{
+      position:absolute;
+      top:34px; right:0;
+      background:#fff;
+      border:1px solid #cfd4dc;
+      border-radius:12px;
+      box-shadow:0 10px 26px rgba(0,0,0,0.16);
+      padding:8px;
+      display:none;
+      z-index:200;
+    }
+    .colorMenu.open{ display:block; }
+    .colorGrid{
+      display:grid;
+      grid-template-columns: repeat(3, 22px);
+      gap:8px;
+    }
+    .colorOpt{
+      width:22px; height:22px;
+      border-radius:6px;
+      border:1px solid rgba(0,0,0,0.18);
+      cursor:pointer;
+    }
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="uiWrap">
+      
+      <div class="header">
+        <h1>Relative Performance Charts（相対比較チャート）</h1>
+        <span class="sub" id="autoStatus">PtoCSV_long.csv を自動読込します</span>
+
+        <div class="headerRight">
+          <span class="chip" id="latestChip"><span class="muted">最新</span> -</span>
+          <span class="chip" id="viewChip"><span class="muted">表示範囲</span> -</span>
+        </div>
+      </div>
+
+      <div class="rows">
+        <div class="controls">
+          <div class="group">
+            <div class="label">起点（営業日前）</div>
+            <input id="baseRange" type="range" min="1" max="300" step="1" value="100">
+            <input id="baseNum" type="number" min="1" max="300" step="1" value="100">
+            <span class="chip big" id="baseDateChip"><span class="muted">起点日</span> -</span>
+          </div>
+
+          <div class="group">
+            <div class="label">表示本数</div>
+            <input id="countRange" type="range" min="10" max="700" step="1" value="200">
+            <input id="countNum" type="number" min="10" max="700" step="1" value="200">
+          </div>
+        </div>
+
+        <div class="controls">
+          <div class="group" style="width:100%; align-items:stretch;">
+                        <div id="symbolConfigBox" class="symbox"></div>
+          </div>
+        </div>
+
+        <div class="hintRow">
+          <div class="group" style="padding:6px 10px; gap:12px;">
+            <label class="check">
+              <input id="showPreBase" type="checkbox">
+              起点前を表示
+            </label>
+            <label class="check">
+              <input id="showBaseLine" type="checkbox" checked>
+              起点ライン表示
+            </label>
+          </div>
+          <div class="right"><div class="legend" id="legend"></div></div>
+        </div>
+
+        </div>
+      </div>
+      <div class="chartWrap">
+        <div class="canvasBox">
+          <canvas id="mainChart"></canvas>
+        </div>
+      
+      </div>
+    </div>
+
+    <div id="tooltip" class="tooltip"></div>
+  </div>
+
+<script>
+const COLOR_PALETTE = [
+  { hex: "#FF4B00", name: "鮮やかな黄みの赤" },
+  { hex: "#005AFF", name: "鮮やかな青" },
+  { hex: "#03AF7A", name: "重厚な青みの緑" },
+  { hex: "#4DC4FF", name: "シアン色" },
+  { hex: "#F6AA00", name: "鮮やかな黄みの橙" },
+  { hex: "#FFF100", name: "鮮やかな黄" },
+  { hex: "#000000", name: "漆黒の黒色" },
+  { hex: "#990099", name: "奥深い紫色" },
+  { hex: "#84919E", name: "グレー" }
+];
+
+const INITIAL_COLORS = ["#FF4B00","#005AFF","#03AF7A","#4DC4FF","#F6AA00","#FFF100"];
+
+const MAX_SYMBOLS = 6;
+
+// 表示対象（最大8）。キーはCSVの「商品名」に一致させる
+let symbolConfig = [
+  { enabled: true,  key: "日経平均終値", label: "日経平均", color: INITIAL_COLORS[0], width: 2 },
+  { enabled: true,  key: "TOPIX終値",     label: "TOPIX",   color: INITIAL_COLORS[1], width: 2 },
+  { enabled: false, key: "",             label: "",        color: INITIAL_COLORS[2], width: 2 },
+  { enabled: false, key: "",             label: "",        color: INITIAL_COLORS[3], width: 2 },
+  { enabled: false, key: "",             label: "",        color: INITIAL_COLORS[4], width: 2 },
+  { enabled: false, key: "",             label: "",        color: INITIAL_COLORS[5], width: 2 }
+];
+
+const MAX_DISPLAY = 700;
+
+let longRows = [];
+let perfData = null;
+let displayCount = 200;
+let offsetX = 0;
+let baseLookback = 100;
+let showPreBase = false;
+let showBaseLine = true;
+
+let availableNames = [];
+
+let isDragging = false;
+let dragStartX = 0;
+let dragStartOffset = 0;
+
+let mainCanvas, mainCtx;
+let tooltip;
+
+let backBuffer = null;
+function resetBackBuffer(){ backBuffer = null; }
+function saveBackBuffer(){ try{ backBuffer = mainCtx.getImageData(0,0,mainCanvas.width, mainCanvas.height); }catch(e){} }
+function restoreBackBuffer(){ try{ if(backBuffer) mainCtx.putImageData(backBuffer,0,0); }catch(e){} }
+
+function toNum(s){ if(s==null) return NaN; return Number(String(s).replace(/,/g,'').replace(/"/g,'').trim()); }
+function parseDelimitedLine(line, delim){
+  const out=[]; let cur=""; let inQ=false;
+  for(const ch of line){
+    if(ch==='"'){ inQ=!inQ; continue; }
+    if(ch===delim && !inQ){ out.push(cur); cur=""; }
+    else cur+=ch;
+  }
+  out.push(cur);
+  return out;
+}
+function detectDelimiter(headerLine){
+  const tabCount=(headerLine.match(/\t/g)||[]).length;
+  const commaCount=(headerLine.match(/,/g)||[]).length;
+  return tabCount>=commaCount ? "\t" : ",";
+}
+function parseLongFormat(text){
+  const lines=text.trim().split(/\r?\n/);
+  if(lines.length<2) throw new Error("データが空です");
+  const delim=detectDelimiter(lines[0]);
+  const header=parseDelimitedLine(lines[0],delim).map(s=>s.replace(/\r/g,'').trim());
+
+  const idxDate=header.indexOf("日付");
+  const idxName=header.indexOf("商品名");
+  const idxVal=header.indexOf("数値");
+  if(idxDate<0||idxName<0||idxVal<0) throw new Error("必須列(日付, 商品名, 数値)が見つかりません");
+
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const cols=parseDelimitedLine(lines[i],delim);
+    if(!cols || cols.length===0) continue;
+
+    const date=(cols[idxDate]||"").trim();
+    const name=(cols[idxName]||"").trim();
+    const value=toNum(cols[idxVal]);
+    if(!date || !name || Number.isNaN(value)) continue;
+    rows.push({date, name, value});
+  }
+  return rows;
+}
+
+
+function getAvailableNames(rows){
+  const set = new Set();
+  for(const r of rows){ if(r && r.name) set.add(r.name); }
+  return Array.from(set).sort((a,b)=>String(a).localeCompare(String(b)));
+}
+function normalizeLabel(key){
+  return String(key||"")
+    .replace(/終値$/,'')
+    .replace(/指数$/,'')
+    .trim() || String(key||"");
+}
+function paletteHexOrDefault(hex, fallback){
+  const h = String(hex||"").trim().toLowerCase();
+  const hit = COLOR_PALETTE.find(c => c.hex.toLowerCase() === h);
+  if(hit) return hit.hex;
+  if(fallback){
+    const fb = String(fallback).trim().toLowerCase();
+    const hit2 = COLOR_PALETTE.find(c => c.hex.toLowerCase() === fb);
+    if(hit2) return hit2.hex;
+  }
+  return COLOR_PALETTE[0].hex;
+}
+function saveSymbolConfig(){
+  try{ localStorage.setItem('symbolConfig_v3', JSON.stringify(symbolConfig)); }catch(e){}
+}
+function loadSymbolConfig(){
+  try{
+    const raw = localStorage.getItem('symbolConfig_v3');
+    if(!raw) return null;
+    const arr = JSON.parse(raw);
+    if(!Array.isArray(arr)) return null;
+    return arr;
+  }catch(e){ return null; }
+}
+function buildDefaultSymbolConfig(names){
+  // 初期状態:
+  // - list.csv がある場合: availableNames は list.csv 順になっているため、その先頭から採用
+  // - 色は指定の INITIAL_COLORS をスロット順に割り当て
+  const out = [];
+  const pick = (k,label,color,enabled)=>({ enabled: !!enabled, key: k||"", label: label||"", color: color || COLOR_PALETTE[0].hex, width: 2 });
+
+  const ordered = Array.isArray(names) ? names : [];
+
+  // 先頭2枠は「並び順に従って」採用（存在しなければ空）
+  for(let i=0;i<2;i++){
+    const key = ordered[i] || "";
+    if(key){
+      out.push(pick(key, normalizeLabel(key), INITIAL_COLORS[i], true));
+    }else{
+      out.push(pick("", `銘柄${i+1}`, INITIAL_COLORS[i], false));
+    }
+  }
+
+  // 残り枠は無効で色だけ初期割当
+  for(let i=2;i<MAX_SYMBOLS;i++){
+    out.push(pick("", `銘柄${i+1}`, INITIAL_COLORS[i] || COLOR_PALETTE[i % COLOR_PALETTE.length].hex, false));
+  }
+  return out;
+}
+function sanitizeSymbolConfig(names){
+  const saved = loadSymbolConfig();
+  let cfg = Array.isArray(saved) ? saved : buildDefaultSymbolConfig(names);
+
+  // 正規化
+  cfg = cfg
+    .filter(s => s && typeof s === 'object')
+    .slice(0, MAX_SYMBOLS)
+    .map((s,i)=>({
+      enabled: !!s.enabled,
+      key: (names.includes(s.key) ? s.key : ""),
+      label: (s.label ? String(s.label) : (s.key ? normalizeLabel(s.key) : `銘柄${i+1}`)),
+      color: paletteHexOrDefault(s.color, INITIAL_COLORS[i] || COLOR_PALETTE[i % COLOR_PALETTE.length].hex),
+      width: (Number.isFinite(Number(s.width)) ? Math.max(1, Math.min(4, Math.round(Number(s.width)))) : 2)
+    }));
+
+  // MAX_SYMBOLS までスロットを埋める
+  while(cfg.length < MAX_SYMBOLS){
+    cfg.push({ enabled:false, key:"", label:`銘柄${cfg.length+1}`, color: COLOR_PALETTE[cfg.length % COLOR_PALETTE.length].hex, width:2 });
+  }
+
+  symbolConfig = cfg;
+  saveSymbolConfig();
+}
+
+function renderLegend(){
+  const box = document.getElementById('legend');
+  if(!box) return;
+  box.innerHTML = '';
+  if(!perfData || !perfData.series || perfData.series.length===0) return;
+
+  for(const s of perfData.series){
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    const sw = document.createElement('span');
+    sw.className = 'swatch';
+    sw.style.background = s.color;
+    item.appendChild(sw);
+
+    const txt = document.createElement('span');
+    txt.textContent = `${s.label}`;
+    item.appendChild(txt);
+
+    box.appendChild(item);
+  }
+}
+
+function closeAllColorMenus(except=null){
+  document.querySelectorAll('.colorMenu.open').forEach(el=>{
+    if(except && el === except) return;
+    el.classList.remove('open');
+  });
+}
+
+function renderSymbolConfigUI(){
+  const box = document.getElementById('symbolConfigBox');
+  if(!box) return;
+  box.innerHTML = '';
+
+  for(let i=0;i<MAX_SYMBOLS;i++){
+    const s = symbolConfig[i] || {enabled:false,key:"",label:`銘柄${i+1}`,color:INITIAL_COLORS[i]||COLOR_PALETTE[0].hex,width:2};
+
+    const item = document.createElement('div');
+    item.className = 'symitem';
+
+    const slot = document.createElement('div');
+    slot.className = 'slot';
+    slot.textContent = String(i+1);
+    item.appendChild(slot);
+
+    const nameSel = document.createElement('select');
+    nameSel.className = 'nameSel';
+
+    const optEmpty = document.createElement('option');
+    optEmpty.value = '';
+    optEmpty.textContent = '—';
+    nameSel.appendChild(optEmpty);
+
+    for(const nm of availableNames){
+      const opt = document.createElement('option');
+      opt.value = nm;
+      opt.textContent = normalizeLabel(nm);
+      nameSel.appendChild(opt);
+    }
+    nameSel.value = s.key || '';
+    nameSel.addEventListener('change', ()=>{
+      symbolConfig[i].key = nameSel.value;
+      symbolConfig[i].label = nameSel.value ? normalizeLabel(nameSel.value) : `銘柄${i+1}`;
+      symbolConfig[i].enabled = !!nameSel.value;
+      // 未選択→disabledに寄せる（チェックは尊重するが、キーなしは無効扱い）
+      saveSymbolConfig();
+      recompute();
+    });
+    item.appendChild(nameSel);
+
+    // color button + popover palette (no names)
+    const colorBtn = document.createElement('button');
+    colorBtn.type = 'button';
+    colorBtn.className = 'colorBtn';
+
+    const sw = document.createElement('span');
+    sw.className = 'colorSwatch';
+    sw.style.background = paletteHexOrDefault(s.color, INITIAL_COLORS[i] || COLOR_PALETTE[0].hex);
+    colorBtn.appendChild(sw);
+
+    const menu = document.createElement('div');
+    menu.className = 'colorMenu';
+
+    const grid = document.createElement('div');
+    grid.className = 'colorGrid';
+
+    for(const c of COLOR_PALETTE){
+      const opt = document.createElement('div');
+      opt.className = 'colorOpt';
+      opt.style.background = c.hex;
+      opt.title = c.hex;
+      opt.addEventListener('click', (ev)=>{
+        ev.stopPropagation();
+        const picked = c.hex;
+        symbolConfig[i].color = picked;
+        sw.style.background = picked;
+        closeAllColorMenus();
+        saveSymbolConfig();
+        recompute();
+      });
+      grid.appendChild(opt);
+    }
+
+    menu.appendChild(grid);
+    colorBtn.appendChild(menu);
+
+    colorBtn.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      const isOpen = menu.classList.contains('open');
+      closeAllColorMenus();
+      if(!isOpen) menu.classList.add('open');
+    });
+
+    item.appendChild(colorBtn);
+    box.appendChild(item);
+  }
+}
+function buildPerf(rows, lookback, symbols){
+  const active = (symbols || []).filter(s => s && s.key);
+  if(active.length === 0){
+    return { dates: [], series: [], baseIndex: null, baseDate: null, latestDate: null, lookback };
+  }
+
+  const mapByName = new Map();
+  for(const s of active) mapByName.set(s.key, new Map());
+
+  for(const r of rows){
+    if(!mapByName.has(r.name)) continue;
+    mapByName.get(r.name).set(r.date, r.value);
+  }
+
+  // union of dates across all active symbols
+  const unionSet = new Set();
+  for(const s of active){
+    for(const d of mapByName.get(s.key).keys()) unionSet.add(d);
+  }
+  const dates = Array.from(unionSet);
+
+  dates.sort((a,b)=>{
+    const ta=new Date(a).getTime(), tb=new Date(b).getTime();
+    if(!Number.isNaN(ta) && !Number.isNaN(tb)) return ta-tb;
+    return String(a).localeCompare(String(b));
+  });
+
+  if(dates.length === 0){
+    return { dates: [], series: [], baseIndex: null, baseDate: null, latestDate: null, lookback };
+  }
+
+  const latestIndex = dates.length - 1;
+  const latestDate = dates[latestIndex];
+
+  const lb = Math.max(1, Math.min(lookback, latestIndex));
+  const baseIndex = Math.max(0, latestIndex - lb);
+  const baseDate = dates[baseIndex];
+
+  const series = active.map(s=>{
+    const m = mapByName.get(s.key);
+
+    // Prefer value on baseDate; if missing, use the nearest prior available value.
+    // If none prior exists, fall back to the nearest subsequent available value.
+    let baseVal = m.get(baseDate);
+    if(baseVal == null){
+      for(let i=baseIndex; i>=0; i--){
+        const v = m.get(dates[i]);
+        if(v != null){ baseVal = v; break; }
+      }
+    }
+    if(baseVal == null){
+      for(let i=baseIndex; i<dates.length; i++){
+        const v = m.get(dates[i]);
+        if(v != null){ baseVal = v; break; }
+      }
+    }
+
+    const values = dates.map(d=>{
+      const v = m.get(d);
+      if(v == null || baseVal == null) return null;
+      return (v / baseVal) * 100.0;
+    });
+
+    return { label: s.label || s.key, color: s.color, width: s.width || 2, values };
+  });
+
+  return { dates, series, baseIndex, baseDate, latestDate, lookback: lb };
+}
+
+function effectiveAvailableLength(){
+  if(!perfData || !perfData.dates) return 0;
+  return showPreBase ? perfData.dates.length : (perfData.dates.length - (perfData.baseIndex ?? 0));
+}
+function toAbsoluteIndex(idxEff){
+  if(idxEff == null) return null;
+  const base = showPreBase ? 0 : (perfData.baseIndex ?? 0);
+  return base + idxEff;
+}
+
+function clampView(){
+  const nEff = effectiveAvailableLength();
+  const minCount = 10;
+
+  displayCount = Math.max(minCount, Math.min(displayCount, MAX_DISPLAY));
+
+  const maxOffset = Math.max(0, nEff - displayCount);
+  offsetX = Math.max(0, Math.min(Math.round(offsetX), maxOffset));
+}
+function getVisibleWindow(){
+  clampView();
+  const nEff = effectiveAvailableLength();
+
+  const startRaw = nEff - displayCount - offsetX;
+  const endRaw = startRaw + displayCount;
+
+  const start = Math.max(0, startRaw);
+  const end = Math.min(nEff, endRaw);
+
+  const absStart = toAbsoluteIndex(start);
+  const absEnd = toAbsoluteIndex(end);
+
+  const realDates = (absStart < absEnd) ? perfData.dates.slice(absStart, absEnd) : [];
+  const realLen = realDates.length;
+
+  const padN = displayCount - realLen;
+  const pads = new Array(Math.max(0,padN)).fill("");
+
+  const visibleDates = pads.concat(realDates);
+  const visibleAbsIndices = new Array(Math.max(0,padN)).fill(null).concat(
+    Array.from({length: realLen}, (_,i)=> absStart + i)
+  );
+
+  return { visibleDates, visibleAbsIndices };
+}
+
+function updateLatestChip(){
+  const el = document.getElementById('latestChip');
+  if(!perfData || !perfData.latestDate){
+    el.innerHTML = `<span class="muted">最新</span> -`;
+    return;
+  }
+  el.innerHTML = `<span class="muted">最新</span> ${perfData.latestDate}`;
+}
+
+function updateBaseChip(){
+  const chip = document.getElementById('baseDateChip');
+  if(!perfData || !perfData.baseDate){
+    chip.innerHTML = `<span class="muted">起点日</span> -`;
+    return;
+  }
+  chip.innerHTML = `<span class="muted">起点日</span> ${perfData.baseDate}`;
+}
+
+function updateViewChip(){
+  const chip = document.getElementById('viewChip');
+  if(!perfData || !perfData.dates || perfData.dates.length===0){
+    chip.innerHTML = `<span class="muted">表示範囲</span> -`;
+    return;
+  }
+  const { visibleDates } = getVisibleWindow();
+  let startDate=null, endDate=null;
+  for(let i=0;i<visibleDates.length;i++){ if(visibleDates[i]){ startDate=visibleDates[i]; break; } }
+  for(let i=visibleDates.length-1;i>=0;i--){ if(visibleDates[i]){ endDate=visibleDates[i]; break; } }
+  chip.innerHTML = `<span class="muted">表示範囲</span> ${startDate&&endDate ? `${startDate} ~ ${endDate}` : '-'}`;
+}
+
+function syncBaseControls(maxLookback){
+  const r=document.getElementById('baseRange');
+  const n=document.getElementById('baseNum');
+  r.max=String(maxLookback);
+  n.max=String(maxLookback);
+  r.value=String(baseLookback);
+  n.value=String(baseLookback);
+}
+function syncCountControls(){
+  const r=document.getElementById('countRange');
+  const n=document.getElementById('countNum');
+  r.max=String(MAX_DISPLAY);
+  n.max=String(MAX_DISPLAY);
+  r.value=String(displayCount);
+  n.value=String(displayCount);
+}
+function snapWindowToBase(){ offsetX = 0; }
+
+function recompute(){
+  if(!longRows || longRows.length===0) return;
+
+  perfData = buildPerf(longRows, baseLookback, symbolConfig);
+
+  const maxLookback = Math.max(1, (perfData.dates.length>0 ? perfData.dates.length-1 : 1));
+  baseLookback = Math.min(baseLookback, maxLookback);
+  syncBaseControls(maxLookback);
+
+  displayCount = Math.max(10, Math.min(displayCount, MAX_DISPLAY));
+  syncCountControls();
+
+  snapWindowToBase();
+
+  updateLatestChip();
+  updateBaseChip();
+  updateViewChip();
+  renderLegend();
+  drawChart();
+}
+
+function shouldDrawMonthlyLines(){
+  return displayCount <= 500 ? 1 : 2;
+}
+function isMonthBoundary(prevDateStr, curDateStr){
+  if(!prevDateStr || !curDateStr) return false;
+  return prevDateStr.slice(0,7) !== curDateStr.slice(0,7);
+}
+function isYearBoundary(prevDateStr, curDateStr){
+  if(!prevDateStr || !curDateStr) return false;
+  return prevDateStr.slice(0,4) !== curDateStr.slice(0,4);
+}
+
+function drawChart(){
+  if(!mainCanvas) return;
+
+  if(!perfData || !perfData.dates || perfData.dates.length===0 || !perfData.series || perfData.series.length===0){
+    resetBackBuffer();
+    mainCtx.clearRect(0,0,mainCanvas.width, mainCanvas.height);
+    mainCtx.fillStyle='#6b7280';
+    mainCtx.textAlign='center';
+    mainCtx.fillText("No Data", mainCanvas.width/2, mainCanvas.height/2);
+    return;
+  }
+
+  const { visibleDates, visibleAbsIndices } = getVisibleWindow();
+  drawMain(visibleDates, visibleAbsIndices);
+  saveBackBuffer();
+}
+
+function drawMain(visibleDates, visibleAbsIndices){
+  const ctx=mainCtx;
+  const w=mainCanvas.width, h=mainCanvas.height;
+
+  const pad={t:18,b:30,l:12,r:62};
+  const chartW=w-pad.l-pad.r;
+  const chartH=h-pad.t-pad.b;
+
+  ctx.clearRect(0,0,w,h);
+
+  let minV=Infinity, maxV=-Infinity;
+  for(const s of perfData.series){
+    for(const absIdx of visibleAbsIndices){
+      if(absIdx==null) continue;
+      const v=s.values[absIdx];
+      if(v==null || Number.isNaN(v)) continue;
+      minV=Math.min(minV,v); maxV=Math.max(maxV,v);
+    }
+  }
+  if(minV===Infinity){
+    ctx.fillStyle='#6b7280'; ctx.textAlign='center'; ctx.fillText("No Data", w/2, h/2);
+    return;
+  }
+  const range=(maxV-minV)||1;
+  minV -= range*0.06;
+  maxV += range*0.06;
+
+  const scaleY=chartH/(maxV-minV);
+  const getX=(i)=>pad.l+(i+0.5)*(chartW/visibleDates.length);
+  const getY=(val)=>pad.t+chartH-(val-minV)*scaleY;
+
+  // horizontal grid
+  ctx.strokeStyle='#eef0f3'; ctx.lineWidth=1;
+  const gridSteps=5;
+  for(let i=0;i<=gridSteps;i++){
+    const y=pad.t+(chartH*i/gridSteps);
+    const v=maxV-(maxV-minV)*(i/gridSteps);
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
+    ctx.fillStyle='#9aa1ab'; ctx.textAlign='left';
+    ctx.fillText(v.toFixed(0), w-pad.r+6, y+4);
+  }
+
+  // month boundary vertical lines (behind series)
+  const stepMonths = shouldDrawMonthlyLines(); // 1 or 2
+  let monthCounter = 0;
+  for(let i=0;i<visibleDates.length;i++){
+    const cur = visibleDates[i];
+    const prev = (i>0 ? visibleDates[i-1] : null);
+    if(!cur || !prev) continue;
+
+    if(isMonthBoundary(prev, cur)){
+      const x = getX(i) - (chartW/visibleDates.length)/2; // boundary between i-1 and i
+      const yearBoundary = isYearBoundary(prev, cur);
+
+      if(yearBoundary){
+        ctx.save();
+        ctx.strokeStyle = '#c5cbd3';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x, pad.t);
+        ctx.lineTo(x, pad.t+chartH);
+        ctx.stroke();
+        ctx.restore();
+        continue;
+      }
+
+      monthCounter += 1;
+      if(stepMonths === 1 || (monthCounter % stepMonths === 0)){
+        ctx.save();
+        ctx.strokeStyle = '#d9dee6';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x, pad.t);
+        ctx.lineTo(x, pad.t+chartH);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+
+  // baseline 100
+  const y100=getY(100);
+  ctx.save();
+  ctx.strokeStyle='#8b929c';       // darker
+  ctx.lineWidth=1.2;
+  ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(pad.l,y100); ctx.lineTo(w-pad.r,y100); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#6b7280';         // darker text
+  ctx.textAlign='left';
+  ctx.font='bold 14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'; // ~20% larger
+  ctx.fillText("100", w-pad.r+6, y100+4);
+  ctx.restore();
+
+  // x labels
+  visibleDates.forEach((d,i)=>{
+    if(d && i % Math.ceil(visibleDates.length/6)===0){
+      ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--axisDark').trim() || '#6b7280';
+      ctx.textAlign='center';
+      ctx.fillText(d, getX(i), h-6);
+    }
+  });
+
+  // base vertical line (optional)
+  if(showBaseLine){
+    const baseAbs = perfData.baseIndex;
+    const baseVisIdx = visibleAbsIndices.findIndex(v => v === baseAbs);
+    if(baseVisIdx >= 0){
+      const xBase = getX(baseVisIdx);
+      ctx.save();
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--baseRed').trim() || '#cc4a59';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(xBase, pad.t);
+      ctx.lineTo(xBase, pad.t + chartH);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // positions for tooltip
+  mainCanvas.pointPositions = visibleDates.map((d,i)=>({
+    x:getX(i),
+    w:chartW/visibleDates.length,
+    absIndex:visibleAbsIndices[i],
+    date:d
+  }));
+
+  // lines
+  for(const s of perfData.series){
+    ctx.strokeStyle=s.color;
+    ctx.lineWidth=s.width;
+    ctx.beginPath();
+    let moved=false;
+    visibleAbsIndices.forEach((absIdx,i)=>{
+      if(absIdx==null){ moved=false; return; }
+      const v=s.values[absIdx];
+      if(v==null || Number.isNaN(v)){ moved=false; return; }
+      const x=getX(i), y=getY(v);
+      if(!moved){ ctx.moveTo(x,y); moved=true; } else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+  }
+}
+
+function drawCrosshair(x){
+  restoreBackBuffer();
+  if(x<0) return;
+  mainCtx.save();
+  mainCtx.strokeStyle='#9aa1ab';
+  mainCtx.setLineDash([3,3]);
+  mainCtx.beginPath(); mainCtx.moveTo(x,0); mainCtx.lineTo(x,mainCanvas.height); mainCtx.stroke();
+  mainCtx.restore();
+}
+function fmt(n){
+  return (n!==null && n!==undefined && !Number.isNaN(n))
+    ? n.toLocaleString(undefined,{maximumFractionDigits:2})
+    : '-';
+}
+function handleTooltip(e){
+  const pps = mainCanvas.pointPositions;
+  if(!pps || !perfData) return;
+
+  const rect=mainCanvas.getBoundingClientRect();
+  const mouseX=e.clientX-rect.left;
+
+  const p = pps.find(pp => mouseX >= pp.x - pp.w/2 && mouseX <= pp.x + pp.w/2);
+  if(!p){
+    tooltip.style.display='none';
+    drawCrosshair(-1);
+    return;
+  }
+
+  drawCrosshair(p.x);
+
+  const absIdx = p.absIndex;
+  if(absIdx==null){ tooltip.style.display='none'; return; }
+
+  const date = perfData.dates[absIdx] || p.date || "";
+  let html = `<strong>${date}</strong><br>`;
+  for(const s of perfData.series){
+    html += `<span style="color:${s.color}; font-weight:700;">${s.label}</span>: ${fmt(s.values[absIdx])}<br>`;
+  }
+  tooltip.innerHTML = html;
+  tooltip.style.display='block';
+
+  let tx=e.clientX+14, ty=e.clientY+14;
+  if(tx+230>window.innerWidth) tx-=250;
+  tooltip.style.left=tx+'px';
+  tooltip.style.top=ty+'px';
+}
+
+function onWheelZoom(e){
+  e.preventDefault();
+  if(!perfData || !perfData.dates || perfData.dates.length===0) return;
+
+  const shrink = (e.deltaY < 0);
+  displayCount += (shrink ? -1 : +1);
+  displayCount = Math.max(10, Math.min(displayCount, MAX_DISPLAY));
+
+  offsetX = 0;
+
+  syncCountControls();
+  updateViewChip();
+  drawChart();
+}
+
+function onMouseDown(e){
+  if(!perfData || !perfData.dates || perfData.dates.length===0) return;
+  isDragging = true;
+  dragStartX = e.clientX;
+  dragStartOffset = offsetX;
+  document.body.style.cursor = 'grabbing';
+}
+function onMouseMove(e){
+  if(!perfData || !perfData.dates || perfData.dates.length===0) return;
+
+  if(isDragging){
+    const rect = mainCanvas.getBoundingClientRect();
+    const usableW = Math.max(1, rect.width - 100);
+    const diffX = e.clientX - dragStartX;
+    const ppc = Math.max(1, usableW / displayCount);
+    const moveBars = diffX / ppc;
+
+    const nEff = effectiveAvailableLength();
+    const maxOffset = Math.max(0, nEff - displayCount);
+
+    let newOffset = dragStartOffset + moveBars;
+    newOffset = Math.max(0, Math.min(newOffset, maxOffset));
+    offsetX = Math.round(newOffset);
+
+    updateViewChip();
+    drawChart();
+  }else{
+    handleTooltip(e);
+  }
+}
+function onMouseUp(){
+  isDragging = false;
+  document.body.style.cursor = 'default';
+}
+function onMouseLeave(){
+  if(isDragging) onMouseUp();
+  tooltip.style.display='none';
+  drawCrosshair(-1);
+}
+
+function bindControls(){
+  const baseRange=document.getElementById('baseRange');
+  const baseNum=document.getElementById('baseNum');
+  const showPre=document.getElementById('showPreBase');
+  const baseLine=document.getElementById('showBaseLine');
+
+  const countRange=document.getElementById('countRange');
+  const countNum=document.getElementById('countNum');
+
+  const setBase=(v)=>{
+    const n=Number(v);
+    if(!Number.isFinite(n)) return;
+    baseLookback=Math.max(1, Math.round(n));
+    baseRange.value=String(baseLookback);
+    baseNum.value=String(baseLookback);
+    recompute();
+  };
+  const setShowPre=()=>{
+    showPreBase=!!showPre.checked;
+    recompute();
+  };
+  const setBaseLine=()=>{
+    showBaseLine=!!baseLine.checked;
+    drawChart();
+  };
+  const setCount=(v)=>{
+    const n=Number(v);
+    if(!Number.isFinite(n)) return;
+    displayCount=Math.max(10, Math.min(Math.round(n), MAX_DISPLAY));
+    countRange.value=String(displayCount);
+    countNum.value=String(displayCount);
+
+    offsetX=0;
+    updateViewChip();
+    drawChart();
+  };
+
+  baseRange.addEventListener('input', ()=>setBase(baseRange.value));
+  baseNum.addEventListener('change', ()=>setBase(baseNum.value));
+  showPre.addEventListener('change', setShowPre);
+  baseLine.addEventListener('change', setBaseLine);
+
+  countRange.addEventListener('input', ()=>setCount(countRange.value));
+  countNum.addEventListener('change', ()=>setCount(countNum.value));
+}
+
+
+async function loadListCsv(allNames){
+  // Optional: list.csv in same folder. One product name per line (or first column of CSV/TSV).
+  // Order in list.csv defines the UI order. Lines starting with # are ignored.
+  // Encoding: supports UTF-8 and Shift_JIS. If allNames is provided, choose the decode that matches more.
+  async function fetchText(decoderName){
+    const res = await fetch('./list.csv', {cache:'no-store'});
+    if(!res.ok) return null;
+    const buf = await res.arrayBuffer();
+    const dec = new TextDecoder(decoderName, {fatal:false});
+    return dec.decode(buf);
+  }
+  function parseToNames(text){
+    if(!text) return null;
+    const lines = text.split(/\r?\n/);
+    const out = [];
+    for(const raw of lines){
+      let line = String(raw||"");
+      // strip BOM-like char if any
+      line = line.replace(/^\uFEFF/, "").trim();
+      if(!line || line.startsWith('#')) continue;
+      const first = line.split(/\t|,/)[0].replace(/^"+|"+$/g,'').trim();
+      if(first) out.push(first);
+    }
+    const seen = new Set();
+    const uniq = [];
+    for(const n of out){
+      if(seen.has(n)) continue;
+      seen.add(n);
+      uniq.push(n);
+    }
+    return uniq.length ? uniq : null;
+  }
+  function matchCount(names){
+    if(!Array.isArray(allNames) || !Array.isArray(names)) return 0;
+    const set = new Set(allNames);
+    let c = 0;
+    for(const n of names){ if(set.has(n)) c++; }
+    return c;
+  }
+
+  try{
+    const tUtf8 = await fetchText('utf-8');
+    const nUtf8 = parseToNames(tUtf8);
+
+    const tSjis = await fetchText('shift-jis');
+    const nSjis = parseToNames(tSjis);
+
+    if(!nUtf8 && !nSjis) return null;
+    if(!allNames) return (nUtf8 || nSjis);
+
+    const cUtf8 = matchCount(nUtf8);
+    const cSjis = matchCount(nSjis);
+
+    return (cSjis > cUtf8 ? nSjis : nUtf8);
+  }catch(e){
+    return null;
+  }
+}
+
+
+async function autoLoad(){
+  const el=document.getElementById('autoStatus');
+  try{
+    el.textContent="PtoCSV_long.csv を読み込み中...";
+    const res=await fetch('./PtoCSV_long.csv', {cache:'no-store'});
+    if(!res.ok) throw new Error(`fetch失敗: ${res.status} ${res.statusText}`);
+    const text=await res.text();
+    longRows=parseLongFormat(text);
+    el.textContent=`ロード完了: ${longRows.length.toLocaleString()}行`;
+
+    const allNames = getAvailableNames(longRows);
+    const listOrder = await loadListCsv(allNames);
+    // If list.csv exists: show only names that match data, in list.csv order.
+    // If not: fall back to allNames.
+    availableNames = (listOrder ? listOrder.filter(n => allNames.includes(n)) : allNames);
+
+    sanitizeSymbolConfig(availableNames);
+    renderSymbolConfigUI();
+
+    perfData = buildPerf(longRows, baseLookback, symbolConfig);
+
+    updateLatestChip();
+
+    const maxLookback = Math.max(1, (perfData.dates.length>0 ? perfData.dates.length-1 : 1));
+    baseLookback = Math.min(baseLookback, maxLookback);
+    syncBaseControls(maxLookback);
+
+    displayCount = Math.max(10, Math.min(displayCount, MAX_DISPLAY));
+    syncCountControls();
+
+    snapWindowToBase();
+    updateBaseChip();
+    updateViewChip();
+    renderLegend();
+    drawChart();
+  }catch(e){
+    console.error(e);
+    el.textContent=`自動読込エラー: ${e.message}`;
+  }
+}
+
+function resizeCanvas(){
+  resetBackBuffer();
+  const rect=mainCanvas.getBoundingClientRect();
+  mainCanvas.width=Math.floor(rect.width);
+  mainCanvas.height=Math.floor(rect.height);
+  drawChart();
+}
+function init(){
+  mainCanvas=document.getElementById('mainChart');
+  mainCtx=mainCanvas.getContext('2d');
+  tooltip=document.getElementById('tooltip');
+
+  bindControls();
+
+  // close color menus when clicking outside
+  document.addEventListener('click', ()=>closeAllColorMenus());
+
+  mainCanvas.addEventListener('wheel', onWheelZoom, {passive:false});
+  mainCanvas.addEventListener('mousedown', onMouseDown);
+  mainCanvas.addEventListener('mousemove', onMouseMove);
+  mainCanvas.addEventListener('mouseup', onMouseUp);
+  mainCanvas.addEventListener('mouseleave', onMouseLeave);
+  window.addEventListener('resize', resizeCanvas);
+
+  resizeCanvas();
+  autoLoad();
+}
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
