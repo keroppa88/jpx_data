@@ -375,7 +375,7 @@ function parsePtoCsvToLong(text){
   const lines=text.trim().split(/\r?\n/);
   if(lines.length<2) throw new Error("PtoCSV.csv: データが空です");
   const delim=detectDelimiter(lines[0]);
-  const header=parseDelimitedLine(lines[0],delim).map(s=>s.replace(/\r/g,'').trim());
+  const header=parseDelimitedLine(lines[0],delim).map(cleanHeaderValue);
 
   const idxDate=header.indexOf("日付");
   const idxName=header.indexOf("商品名");
@@ -399,7 +399,7 @@ function parseTsePrimeToLong(text){
   const lines=text.trim().split(/\r?\n/);
   if(lines.length<2) throw new Error("TSEPrime.csv: データが空です");
   const delim=detectDelimiter(lines[0]);
-  const header=parseDelimitedLine(lines[0],delim).map(s=>s.replace(/\r/g,'').trim());
+  const header=parseDelimitedLine(lines[0],delim).map(cleanHeaderValue);
 
   const idxPubDate=header.indexOf("PubDate") >= 0 ? header.indexOf("PubDate") : header.indexOf("公表日");
   const idxSection=header.indexOf("Section") >= 0 ? header.indexOf("Section") : header.indexOf("市場名");
