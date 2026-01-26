@@ -88,7 +88,6 @@
     .legend-item{ display:flex; align-items:center; gap:6px; font-size:12px; color:#374151; }
     .swatch{ width:12px; height:12px; border-radius:3px; border:1px solid rgba(0,0,0,0.15); }
 
-    /* Pull-down area (explicit, always visible) */
     .selRow{
       display:flex;
       gap:10px;
@@ -124,7 +123,7 @@
     .canvasBox{ position:relative; background:#fff; }
     canvas{ display:block; width:100%; cursor:crosshair; }
     #idxChart{ height:260px; }
-    #tseChart{ height:520px; } /* 以前の半分（780 -> 520） */
+    #tseChart{ height:520px; }
 
     .tooltip{
       position:fixed;
@@ -163,7 +162,6 @@
         </div>
 
         <div class="grid2">
-          <!-- ===== Index chart (1 pull-down) ===== -->
           <div class="chartCard">
             <div class="chartHead">
               <div class="chartTitle">株価指数（PtoCSV.csv / list.csv）</div>
@@ -180,7 +178,6 @@
             </div>
           </div>
 
-          <!-- ===== TSE chart (5 pull-downs) ===== -->
           <div class="chartCard">
             <div class="chartHead">
               <div class="chartTitle">部門別売買動向（TSEPrime.csv / bumonlist.csv）</div>
@@ -232,14 +229,14 @@ const TSEPRIME_FIELD_MAP = {
 };
 
 /* ========= state ========= */
-let idxRows = [];   // {date,name,value}
-let tseRows = [];   // {date,name,value}
+let idxRows = [];
+let tseRows = [];
 let idxDates = [];
 let tseDates = [];
 let globalDates = [];
 
 let displayCount = 200;
-let offsetX = 0; // shared
+let offsetX = 0;
 
 let isDragging = false;
 let dragStartX = 0;
@@ -251,13 +248,20 @@ let idxCanvas, idxCtx, tseCanvas, tseCtx, tooltip;
 let idxAvail = [];
 let tseAvail = [];
 
-let idxKey = "";           // 1 item
-let tseKeys = ["","","","",""]; // 5 items
+let idxKey = "";
+let tseKeys = ["","","","",""];
 
 let idxData = null;
 let tseData = null;
 
 /* ========= helpers ========= */
+function cleanHeaderValue(s){
+  return String(s ?? "")
+    .replace(/^\uFEFF/, "")
+    .replace(/^"+|"+$/g, "")
+    .trim();
+}
+
 function toNum(s){
   if(s==null) return NaN;
   return Number(String(s).replace(/,/g,'').replace(/"/g,'').trim());
@@ -370,24 +374,32 @@ function bindControls(){
   countNum.addEventListener('change', ()=>setCount(countNum.value));
 }
 
-function cleanHeaderValue(s){
-  return String(s ?? "")
-    .replace(/^\uFEFF/, "")     // BOM除去
-    .replace(/^"+|"+$/g, "")    // 両端クォート除去
-    .trim();
+/* ========= encoding-safe fetch ========= */
+async function fetchTextAutoEncoding(url){
+  const res = await fetch(url, {cache:"no-store"});
+  if(!res.ok) throw new Error(`${url} fetch失敗: ${res.status} ${res.statusText}`);
+  const buf = await res.arrayBuffer();
+
+  const tUtf8 = new TextDecoder("utf-8", {fatal:false}).decode(buf);
+  // ここは「典型的に含まれるはずの識別子」で雑に判定（十分実用）
+  if (tUtf8.includes("PubDate") || tUtf8.includes("公表日") || tUtf8.includes("PropSell") || tUtf8.includes("自己計") || tUtf8.includes("日付")) {
+    return tUtf8;
+  }
+  const tSjis = new TextDecoder("shift-jis", {fatal:false}).decode(buf);
+  return tSjis;
 }
-  
+
 /* ========= parsers ========= */
 function parsePtoCsvToLong(text){
   const lines=text.trim().split(/\r?\n/);
-  if(lines.length<2) throw new Error("PtoCSV.csv: データが空です");
+  if(lines.length<2) throw new Error("PtoCSV_long.csv: データが空です");
   const delim=detectDelimiter(lines[0]);
   const header=parseDelimitedLine(lines[0],delim).map(cleanHeaderValue);
 
   const idxDate=header.indexOf("日付");
   const idxName=header.indexOf("商品名");
   const idxVal=header.indexOf("数値");
-  if(idxDate<0||idxName<0||idxVal<0) throw new Error("PtoCSV.csv: 必須列(日付, 商品名, 数値)が見つかりません");
+  if(idxDate<0||idxName<0||idxVal<0) throw new Error("PtoCSV_long.csv: 必須列(日付, 商品名, 数値)が見つかりません");
 
   const rows=[];
   for(let i=1;i<lines.length;i++){
@@ -416,7 +428,7 @@ function parseTsePrimeToLong(text){
     .map(([en, jp]) => ({ jp, idx: header.indexOf(en) >= 0 ? header.indexOf(en) : header.indexOf(jp) }))
     .filter(x => x.idx >= 0);
 
-  if(fieldDefs.length===0) throw new Error("TSEPrime.csv: 数値列が見つかりません（Field map 不一致）");
+  if(fieldDefs.length===0) throw new Error("TSEPrime.csv: 数値列が見つかりません（Field map 不一致 / 文字化けの可能性）");
 
   let sectionFilter = null;
   if(idxSection >= 0){
@@ -537,6 +549,8 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices){
 
   ctx.clearRect(0,0,w,h);
 
+  ctx.font = "12px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"; // 念のため固定
+
   if(!data || !data.series || data.series.length===0 || !data.dates || data.dates.length===0){
     ctx.fillStyle='#6b7280';
     ctx.textAlign='center';
@@ -568,7 +582,6 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices){
   const getX=(i)=>pad.l+(i+0.5)*(chartW/visibleDates.length);
   const getY=(val)=>pad.t+chartH-(val-minV)*scaleY;
 
-  // grid + y labels
   ctx.strokeStyle='#eef0f3'; ctx.lineWidth=1;
   const gridSteps=5;
   for(let i=0;i<=gridSteps;i++){
@@ -579,7 +592,6 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices){
     ctx.fillText(String(Math.round(v)), w-pad.r+6, y+4);
   }
 
-  // x labels
   visibleDates.forEach((d,i)=>{
     if(d && i % Math.ceil(visibleDates.length/6)===0){
       ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--axisDark').trim() || '#6b7280';
@@ -588,7 +600,6 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices){
     }
   });
 
-  // tooltip positions
   canvas.pointPositions = visibleDates.map((d,i)=>({
     x:getX(i),
     w:chartW/visibleDates.length,
@@ -596,7 +607,6 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices){
     date:d
   }));
 
-  // lines
   for(const s of data.series){
     ctx.strokeStyle=s.color;
     ctx.lineWidth=s.width;
@@ -712,25 +722,21 @@ function onMouseLeave(){
 function rebuildData(){
   idxData = { dates: idxDates, series: (idxKey ? [buildOneSeries(idxRows, idxKey, INITIAL_COLORS[0], idxDates)] : []) };
   idxData.dateIndex = buildDateIndex(idxDates);
+
   tseData = buildMultiSeries(tseRows, tseKeys, tseDates);
   tseData.dateIndex = buildDateIndex(tseDates);
+
   renderLegend("idxLegend", idxData);
   renderLegend("tseLegend", tseData);
 }
 function redrawAll(){
   const globalWindow = getVisibleWindowForDates(globalDates);
   const resolveWindow = (data, dates) => {
-    const windowForGlobal = globalWindow;
-    const absIndices = mapVisibleDatesToAbsIndices(data && data.dateIndex, windowForGlobal.visibleDates);
+    const absIndices = mapVisibleDatesToAbsIndices(data && data.dateIndex, globalWindow.visibleDates);
     const hasAny = absIndices.some((idx) => idx != null);
-    if (hasAny) {
-      return { window: windowForGlobal, absIndices };
-    }
+    if (hasAny) return { window: globalWindow, absIndices };
     const localWindow = getVisibleWindowForDates(dates);
-    return {
-      window: localWindow,
-      absIndices: mapVisibleDatesToAbsIndices(data && data.dateIndex, localWindow.visibleDates)
-    };
+    return { window: localWindow, absIndices: mapVisibleDatesToAbsIndices(data && data.dateIndex, localWindow.visibleDates) };
   };
 
   const idxWindow = resolveWindow(idxData, idxDates);
@@ -755,7 +761,6 @@ function fillSelect(selectEl, names, current){
   }
   selectEl.value = current || "";
 }
-
 function bindSelects(){
   const idxSel1 = document.getElementById("idxSel1");
   fillSelect(idxSel1, idxAvail, idxKey);
@@ -777,51 +782,39 @@ function bindSelects(){
 }
 
 /* ========= main load ========= */
-async function fetchTextAutoEncoding(url){
-  const res = await fetch(url, {cache:"no-store"});
-  if(!res.ok) throw new Error(`${url} fetch失敗: ${res.status} ${res.statusText}`);
-  const buf = await res.arrayBuffer();
+async function autoLoad(){
+  const statusEl = document.getElementById("status");
 
-  // まずUTF-8で試す → ダメならSJIS
-  const tUtf8 = new TextDecoder("utf-8", {fatal:false}).decode(buf);
+  // 2) 指数データ
+  idxRows = [];
   try{
-    // ここで最低限の列検出に使う文字が含まれているかを見る
-    if (tUtf8.includes("PubDate") || tUtf8.includes("公表日") || tUtf8.includes("PropSell") || tUtf8.includes("自己計")) {
-      return tUtf8;
-    }
-  }catch(e){}
+    statusEl.textContent = "PtoCSV_long.csv 読み込み中…";
+    const txt1 = await fetchTextAutoEncoding("./PtoCSV_long.csv");
+    idxRows = parsePtoCsvToLong(txt1);
+  }catch(e){
+    console.warn(e);
+    statusEl.textContent = `PtoCSV_long.csv 読込エラー: ${e.message}`;
+  }
 
-  const tSjis = new TextDecoder("shift-jis", {fatal:false}).decode(buf);
-  return tSjis;
-}
+  // 3) 部門別データ
+  tseRows = [];
+  try{
+    statusEl.textContent += " / TSEPrime.csv 読み込み中…";
+    const txt2 = await fetchTextAutoEncoding("./data/TSEPrime.csv");
+    tseRows = parseTsePrimeToLong(txt2);
+  }catch(e){
+    console.warn(e);
+    statusEl.textContent += ` / TSEPrime 読込エラー: ${e.message}`;
+  }
 
-// 3) 部門別データ（固定: ./data/TSEPrime.csv）
-tseRows = [];
-try{
-  statusEl.textContent += " / TSEPrime.csv 読み込み中…";
-  const txt2 = await fetchTextAutoEncoding("./data/TSEPrime.csv");
-  tseRows = parseTsePrimeToLong(txt2);
-}catch(e){
-  console.warn(e);
-  statusEl.textContent += ` / TSEPrime 読込エラー: ${e.message}`;
-}
-  
   // 4) プルダウン用リスト
   const idxNamesFromData = uniqSorted(idxRows.map(r => r.name));
   const tseNamesFromData = uniqSorted(tseRows.map(r => r.name));
 
   let idxList = null;
   let tseList = null;
-  try{
-    idxList = await loadNameList("./list.csv");
-  }catch(e){
-    console.warn(e);
-  }
-  try{
-    tseList = await loadNameList("./bumonlist.csv");
-  }catch(e){
-    console.warn(e);
-  }
+  try{ idxList = await loadNameList("./list.csv"); }catch(e){ console.warn(e); }
+  try{ tseList = await loadNameList("./bumonlist.csv"); }catch(e){ console.warn(e); }
 
   idxAvail = (idxList ? idxList.filter(n => idxNamesFromData.includes(n)) : idxNamesFromData);
   if(idxAvail.length === 0) idxAvail = idxNamesFromData;
@@ -833,7 +826,7 @@ try{
   idxDates = buildDateList(idxRows);
   tseDates = buildDateList(tseRows);
   globalDates = buildGlobalDates(idxRows, tseRows);
-  
+
   // restore last selections
   try{
     const k = localStorage.getItem("idxKey_v1");
@@ -849,7 +842,6 @@ try{
     }
   }catch(e){}
 
-  // if empty, pick defaults
   if(!idxKey && idxAvail[0]) idxKey = idxAvail[0];
   for(let i=0;i<5;i++){
     if(!tseKeys[i] && tseAvail[i]) tseKeys[i] = tseAvail[i];
@@ -864,7 +856,8 @@ try{
   rebuildData();
   redrawAll();
 
-  statusEl.textContent = `ロード完了: 日付 ${globalDates.length.toLocaleString()} / 指数行 ${idxRows.length.toLocaleString()} / 部門行 ${tseRows.length.toLocaleString()}`;
+  statusEl.textContent =
+    `ロード完了: 日付 ${globalDates.length.toLocaleString()} / 指数行 ${idxRows.length.toLocaleString()} / 部門行 ${tseRows.length.toLocaleString()}`;
 }
 
 /* ========= init ========= */
