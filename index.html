@@ -370,6 +370,13 @@ function bindControls(){
   countNum.addEventListener('change', ()=>setCount(countNum.value));
 }
 
+function cleanHeaderValue(s){
+  return String(s ?? "")
+    .replace(/^\uFEFF/, "")     // BOM除去
+    .replace(/^"+|"+$/g, "")    // 両端クォート除去
+    .trim();
+}
+  
 /* ========= parsers ========= */
 function parsePtoCsvToLong(text){
   const lines=text.trim().split(/\r?\n/);
@@ -770,35 +777,34 @@ function bindSelects(){
 }
 
 /* ========= main load ========= */
-async function autoLoad(){
-  const statusEl = document.getElementById("status");
+async function fetchTextAutoEncoding(url){
+  const res = await fetch(url, {cache:"no-store"});
+  if(!res.ok) throw new Error(`${url} fetch失敗: ${res.status} ${res.statusText}`);
+  const buf = await res.arrayBuffer();
 
-
-  // 2) 指数データ（固定: ./PtoCSV_long.csv）
-  idxRows = [];
+  // まずUTF-8で試す → ダメならSJIS
+  const tUtf8 = new TextDecoder("utf-8", {fatal:false}).decode(buf);
   try{
-    statusEl.textContent = "PtoCSV_long.csv 読み込み中…";
-    const res1 = await fetch("./PtoCSV_long.csv", {cache:"no-store"});
-    if(!res1.ok) throw new Error(`PtoCSV_long.csv fetch失敗: ${res1.status} ${res1.statusText}`);
-    const txt1 = await res1.text();
-    idxRows = parsePtoCsvToLong(txt1); // long形式ならこのパーサでOK
-  }catch(e){
-    console.warn(e);
-    statusEl.textContent = `PtoCSV_long.csv 読込エラー: ${e.message}`;
-  }
+    // ここで最低限の列検出に使う文字が含まれているかを見る
+    if (tUtf8.includes("PubDate") || tUtf8.includes("公表日") || tUtf8.includes("PropSell") || tUtf8.includes("自己計")) {
+      return tUtf8;
+    }
+  }catch(e){}
 
-  // 3) 部門別データ（固定: ./data/TSEPrime.csv）
-  tseRows = [];
-  try{
-    statusEl.textContent += " / TSEPrime.csv 読み込み中…";
-    const res2 = await fetch("./data/TSEPrime.csv", {cache:"no-store"});
-    if(!res2.ok) throw new Error(`data/TSEPrime.csv fetch失敗: ${res2.status} ${res2.statusText}`);
-    const txt2 = await res2.text();
-    tseRows = parseTsePrimeToLong(txt2);
-  }catch(e){
-    console.warn(e);
-    statusEl.textContent += ` / TSEPrime 読込エラー: ${e.message}`;
-  }
+  const tSjis = new TextDecoder("shift-jis", {fatal:false}).decode(buf);
+  return tSjis;
+}
+
+// 3) 部門別データ（固定: ./data/TSEPrime.csv）
+tseRows = [];
+try{
+  statusEl.textContent += " / TSEPrime.csv 読み込み中…";
+  const txt2 = await fetchTextAutoEncoding("./data/TSEPrime.csv");
+  tseRows = parseTsePrimeToLong(txt2);
+}catch(e){
+  console.warn(e);
+  statusEl.textContent += ` / TSEPrime 読込エラー: ${e.message}`;
+}
   
   // 4) プルダウン用リスト
   const idxNamesFromData = uniqSorted(idxRows.map(r => r.name));
