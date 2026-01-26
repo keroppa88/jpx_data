@@ -712,10 +712,25 @@ function rebuildData(){
 }
 function redrawAll(){
   const globalWindow = getVisibleWindowForDates(globalDates);
-  const idxAbsIndices = mapVisibleDatesToAbsIndices(idxData && idxData.dateIndex, globalWindow.visibleDates);
-  const tseAbsIndices = mapVisibleDatesToAbsIndices(tseData && tseData.dateIndex, globalWindow.visibleDates);
-  drawChartGeneric(idxCtx, idxCanvas, idxData, globalWindow.visibleDates, idxAbsIndices);
-  drawChartGeneric(tseCtx, tseCanvas, tseData, globalWindow.visibleDates, tseAbsIndices);
+  const resolveWindow = (data, dates) => {
+    const windowForGlobal = globalWindow;
+    const absIndices = mapVisibleDatesToAbsIndices(data && data.dateIndex, windowForGlobal.visibleDates);
+    const hasAny = absIndices.some((idx) => idx != null);
+    if (hasAny) {
+      return { window: windowForGlobal, absIndices };
+    }
+    const localWindow = getVisibleWindowForDates(dates);
+    return {
+      window: localWindow,
+      absIndices: mapVisibleDatesToAbsIndices(data && data.dateIndex, localWindow.visibleDates)
+    };
+  };
+
+  const idxWindow = resolveWindow(idxData, idxDates);
+  const tseWindow = resolveWindow(tseData, tseDates);
+
+  drawChartGeneric(idxCtx, idxCanvas, idxData, idxWindow.window.visibleDates, idxWindow.absIndices);
+  drawChartGeneric(tseCtx, tseCanvas, tseData, tseWindow.window.visibleDates, tseWindow.absIndices);
 }
 
 /* ========= select UI ========= */
