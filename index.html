@@ -167,9 +167,9 @@
               <div class="chartTitle">株価指数（PtoCSV.csv / list.csv）</div>
               <div class="legend" id="idxLegend"></div>
               <div class="selRow" id="idxSelRow">
-                <div class="sel">
-                  <div class="slot">1</div>
-                  <select id="idxSel1"></select>
+                <div class="sel"><div class="slot">1</div><select id="idxSel1"></select></div>
+                <div class="sel"><div class="slot">2</div><select id="idxSel2"></select></div>
+                <div class="sel"><div class="slot">3</div><select id="idxSel3"></select></div>
                 </div>
               </div>
             </div>
@@ -248,7 +248,10 @@ let idxCanvas, idxCtx, tseCanvas, tseCtx, tooltip;
 let idxAvail = [];
 let tseAvail = [];
 
-let idxKey = "";
+const IDX_SELECTION_COUNT = 3;
+const IDX_STORAGE_KEY = "idxKeys_v2";
+const IDX_LEGACY_STORAGE_KEY = "idxKey_v1";
+let idxKeys = new Array(IDX_SELECTION_COUNT).fill("");
 let tseKeys = ["","","","",""];
 
 let idxData = null;
@@ -720,7 +723,7 @@ function onMouseLeave(){
 
 /* ========= redraw ========= */
 function rebuildData(){
-  idxData = { dates: idxDates, series: (idxKey ? [buildOneSeries(idxRows, idxKey, INITIAL_COLORS[0], idxDates)] : []) };
+  idxData = buildMultiSeries(idxRows, idxKeys, idxDates);
   idxData.dateIndex = buildDateIndex(idxDates);
 
   tseData = buildMultiSeries(tseRows, tseKeys, tseDates);
@@ -762,13 +765,15 @@ function fillSelect(selectEl, names, current){
   selectEl.value = current || "";
 }
 function bindSelects(){
-  const idxSel1 = document.getElementById("idxSel1");
-  fillSelect(idxSel1, idxAvail, idxKey);
-  idxSel1.addEventListener("change", ()=>{
-    idxKey = idxSel1.value || "";
-    try{ localStorage.setItem("idxKey_v1", idxKey); }catch(e){}
-    rebuildData(); redrawAll();
-  });
+  for(let i=0;i<IDX_SELECTION_COUNT;i++){
+    const el = document.getElementById(`idxSel${i+1}`);
+    fillSelect(el, idxAvail, idxKeys[i]);
+    el.addEventListener("change", ()=>{
+      idxKeys[i] = el.value || "";
+      try{ localStorage.setItem(IDX_STORAGE_KEY, JSON.stringify(idxKeys)); }catch(e){}
+      rebuildData(); redrawAll();
+    });
+  }
 
   for(let i=0;i<5;i++){
     const el = document.getElementById(`tseSel${i+1}`);
@@ -829,8 +834,18 @@ async function autoLoad(){
 
   // restore last selections
   try{
-    const k = localStorage.getItem("idxKey_v1");
-    if(k && idxAvail.includes(k)) idxKey = k;
+    const raw = localStorage.getItem(IDX_STORAGE_KEY);
+    if(raw){
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr) && arr.length){
+        idxKeys = new Array(IDX_SELECTION_COUNT).fill("").map((_, i)=> arr[i] && idxAvail.includes(arr[i]) ? arr[i] : "");
+      }
+    }else{
+      const legacy = localStorage.getItem(IDX_LEGACY_STORAGE_KEY);
+      if(legacy && idxAvail.includes(legacy)){
+        idxKeys[0] = legacy;
+      }
+    }
   }catch(e){}
   try{
     const raw = localStorage.getItem("tseKeys_v1");
@@ -842,7 +857,10 @@ async function autoLoad(){
     }
   }catch(e){}
 
-  if(!idxKey && idxAvail[0]) idxKey = idxAvail[0];
+  if(idxKeys.every(k => !k) && idxAvail[0]) idxKeys[0] = idxAvail[0];
+  for(let i=0;i<IDX_SELECTION_COUNT;i++){
+    if(!idxKeys[i] && idxAvail[i]) idxKeys[i] = idxAvail[i];
+  }
   for(let i=0;i<5;i++){
     if(!tseKeys[i] && tseAvail[i]) tseKeys[i] = tseAvail[i];
   }
