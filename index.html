@@ -54,12 +54,6 @@
       border-radius:12px;
     }
     .label{ font-weight:700; font-size:12px; color:#374151; }
-    input[type="range"]{ width:260px; }
-    input[type="number"]{
-      width:86px; padding:6px 8px;
-      border:1px solid #cfd4dc; border-radius:10px;
-      background:#fff; font-size:13px; text-align:center;
-    }
     .chip{
       display:inline-flex; align-items:center; gap:8px;
       padding:6px 10px;
@@ -104,11 +98,6 @@
     #tseSelContainer.hidden, #idxSelContainer.hidden{
       display:none;
     }
-    .selRow .toggle-btn{
-      margin-left:8px;
-      margin-right:4px;
-      flex-shrink:0;
-    }
     .sel{
       display:flex;
       align-items:center;
@@ -124,6 +113,11 @@
       font-size:11px;
       color:var(--muted);
       flex:0 0 auto;
+    }
+    #idxSlotLabel{
+      width:auto;
+      text-align:left;
+      white-space:nowrap;
     }
     select{
       min-width:180px;
@@ -270,27 +264,20 @@
       <div class="header">
         <h1>株価指数 + 部門別売買動向チャート</h1>
         <span class="sub" id="status">読込中…</span>
-        <div class="headerRight">
-          <span class="chip" id="latestChip"><span class="muted">最新</span> -</span>
-          <span class="chip" id="viewChip"><span class="muted">表示範囲</span> -</span>
-        </div>
       </div>
 
       <div class="rows">
         <div class="controls">
-          <div class="group">
-            <div class="label">表示本数</div>
-            <input id="countRange" type="range" min="10" max="700" step="1" value="200">
-            <input id="countNum" type="number" min="10" max="700" step="1" value="200">
-            <label style="display:flex; align-items:center; gap:4px; margin-left:12px; font-size:12px; cursor:pointer;">
-              <input type="checkbox" id="showDateLine" checked style="width:16px; height:16px; accent-color:#2563eb;">
-              日付ライン
-            </label>
-            <label style="display:flex; align-items:center; gap:4px; margin-left:8px; font-size:12px; cursor:pointer;">
-              <input type="checkbox" id="showFullDate" checked style="width:16px; height:16px; accent-color:#2563eb;">
-              日付表示
-            </label>
-          </div>
+          <span class="chip" id="latestChip"><span class="muted">最新</span> -</span>
+          <span class="chip" id="viewChip"><span class="muted">表示範囲</span> -</span>
+          <label style="display:flex; align-items:center; gap:4px; margin-left:8px; font-size:12px; cursor:pointer;">
+            <input type="checkbox" id="showDateLine" checked style="width:16px; height:16px; accent-color:#2563eb;">
+            日付ライン
+          </label>
+          <label style="display:flex; align-items:center; gap:4px; margin-left:8px; font-size:12px; cursor:pointer;">
+            <input type="checkbox" id="showFullDate" checked style="width:16px; height:16px; accent-color:#2563eb;">
+            日付表示
+          </label>
           <button class="help-btn" id="helpBtn">説明</button>
         </div>
 
@@ -300,15 +287,15 @@
             <div class="chartHead">
               <div class="chartTitle">株価指数</div>
               <div class="legend" id="idxLegend"></div>
+              <button class="toggle-btn" id="idxToggleBtn" title="プルダウンの表示/非表示">－</button>
             </div>
             <div class="selRow" id="idxSelRow" style="padding:8px 12px;">
               <div id="idxSelContainer">
                 <div class="sel">
-                  <div class="slot">銘柄</div>
+                  <div class="slot" id="idxSlotLabel">銘柄</div>
                   <select id="idxSel1"></select>
                 </div>
               </div>
-              <button class="toggle-btn" id="idxToggleBtn" title="プルダウンの表示/非表示">－</button>
             </div>
             <div class="canvasBox">
               <canvas id="idxChart"></canvas>
@@ -320,6 +307,7 @@
             <div class="chartHead">
               <div class="chartTitle">部門別売買動向</div>
               <div class="legend" id="tseLegend"></div>
+              <button class="toggle-btn" id="tseToggleBtn" title="プルダウンの表示/非表示">－</button>
             </div>
             <div class="selRow" id="tseSelRow" style="padding:8px 12px;">
               <div id="tseSelContainer">
@@ -332,7 +320,6 @@
                 <div class="sel"><div class="slot">7</div><select id="tseSel7"></select><input type="color" class="color-picker" id="tseColor7" value="#84919E"><input type="checkbox" class="show-check" id="tseCheck7" checked title="表示/非表示"></div>
                 <div class="sel"><div class="slot">8</div><select id="tseSel8"></select><input type="color" class="color-picker" id="tseColor8" value="#000000"><input type="checkbox" class="show-check" id="tseCheck8" checked title="表示/非表示"></div>
               </div>
-              <button class="toggle-btn" id="tseToggleBtn" title="プルダウンの表示/非表示">－</button>
             </div>
             <div class="canvasBox">
               <canvas id="tseChart"></canvas>
@@ -529,32 +516,9 @@ function updateTopChips(){
   viewEl.innerHTML = `<span class="muted">表示範囲</span> ${startDate && endDate ? `${startDate} ~ ${endDate}` : '-'}`;
 }
 function syncCountControls(){
-  const r=document.getElementById('countRange');
-  const n=document.getElementById('countNum');
-  r.max=String(MAX_DISPLAY);
-  n.max=String(MAX_DISPLAY);
-  r.value=String(displayCount);
-  n.value=String(displayCount);
+  // スライダーは廃止
 }
 function bindControls(){
-  const countRange=document.getElementById('countRange');
-  const countNum=document.getElementById('countNum');
-
-  const setCount=(v)=>{
-    const nn=Number(v);
-    if(!Number.isFinite(nn)) return;
-    const baseDates = getBaseDates();
-    displayCount=Math.max(10, Math.min(Math.round(nn), MAX_DISPLAY, baseDates.length||MAX_DISPLAY));
-    offsetX=0;
-    countRange.value=String(displayCount);
-    countNum.value=String(displayCount);
-    updateTopChips();
-    redrawAll();
-  };
-
-  countRange.addEventListener('input', ()=>setCount(countRange.value));
-  countNum.addEventListener('change', ()=>setCount(countNum.value));
-
   // 日付ラインチェックボックス
   const dateLineCheck = document.getElementById('showDateLine');
   dateLineCheck.checked = showDateLine;
@@ -979,11 +943,12 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, is
     plotMinV = ticks[0];
     plotMaxV = ticks[ticks.length - 1];
     const tickRange = plotMaxV - plotMinV;
-    plotMinV -= tickRange * 0.02;
-    plotMaxV += tickRange * 0.02;
+    // 折れ線が確実にチャート内に収まるようにパディングを追加
+    plotMinV -= tickRange * 0.05;
+    plotMaxV += tickRange * 0.05;
   } else {
-    plotMinV = minV - range*0.06;
-    plotMaxV = maxV + range*0.06;
+    plotMinV = minV - range*0.1;
+    plotMaxV = maxV + range*0.1;
   }
 
   const scaleY=chartH/(plotMaxV-plotMinV);
