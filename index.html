@@ -372,18 +372,28 @@ function mapVisibleDatesToAbsIndices(dateIndex, visibleDates){
 function updateTopChips(){
   const latestEl = document.getElementById("latestChip");
   const viewEl = document.getElementById("viewChip");
-  if(!globalDates || globalDates.length===0){
+
+  // 部門別データを基準にする（メインデータ）
+  const baseDates = tseDates.length > 0 ? tseDates : globalDates;
+
+  if(!baseDates || baseDates.length===0){
     latestEl.innerHTML = `<span class="muted">最新</span> -`;
     viewEl.innerHTML = `<span class="muted">表示範囲</span> -`;
     return;
   }
-  latestEl.innerHTML = `<span class="muted">最新</span> ${globalDates[globalDates.length-1]}`;
+  latestEl.innerHTML = `<span class="muted">最新</span> ${baseDates[baseDates.length-1]}`;
 
-  const { visibleDates } = getVisibleWindowForDates(globalDates);
-  let startDate=null, endDate=null;
-  for(let i=0;i<visibleDates.length;i++){ if(visibleDates[i]){ startDate=visibleDates[i]; break; } }
-  for(let i=visibleDates.length-1;i>=0;i--){ if(visibleDates[i]){ endDate=visibleDates[i]; break; } }
-  viewEl.innerHTML = `<span class="muted">表示範囲</span> ${startDate&&endDate ? `${startDate} ~ ${endDate}` : '-'}`;
+  // 表示範囲を計算
+  const n = baseDates.length;
+  const count = Math.max(10, Math.min(displayCount, MAX_DISPLAY, n || 10));
+  const maxOffset = Math.max(0, n - count);
+  const localOffset = Math.max(0, Math.min(Math.round(offsetX), maxOffset));
+  const start = Math.max(0, n - count - localOffset);
+  const end = Math.min(n, start + count);
+
+  const startDate = baseDates[start] || null;
+  const endDate = baseDates[end - 1] || null;
+  viewEl.innerHTML = `<span class="muted">表示範囲</span> ${startDate && endDate ? `${startDate} ~ ${endDate}` : '-'}`;
 }
 function syncCountControls(){
   const r=document.getElementById('countRange');
@@ -400,7 +410,8 @@ function bindControls(){
   const setCount=(v)=>{
     const nn=Number(v);
     if(!Number.isFinite(nn)) return;
-    displayCount=Math.max(10, Math.min(Math.round(nn), MAX_DISPLAY, globalDates.length||MAX_DISPLAY));
+    const baseDates = getBaseDates();
+    displayCount=Math.max(10, Math.min(Math.round(nn), MAX_DISPLAY, baseDates.length||MAX_DISPLAY));
     offsetX=0;
     countRange.value=String(displayCount);
     countNum.value=String(displayCount);
@@ -712,46 +723,40 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices){
     const color = s.color || '#000000';
     const lineWidth = s.width || 2;
 
-    // 線を描画
-    ctx.save();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineWidth;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-
-    let moved = false;
-    const points = []; // 後で点を描画するために座標を保存
-
+    // 有効なデータポイントを収集
+    const validPoints = [];
     for(let i=0; i<visibleAbsIndices.length; i++){
       const absIdx = visibleAbsIndices[i];
-      if(absIdx == null){ moved = false; continue; }
+      if(absIdx == null) continue;
       const v = getValue(s, absIdx, si);
-      if(v == null || !Number.isFinite(v)){ moved = false; continue; }
+      if(v == null || !Number.isFinite(v)) continue;
       const x = getX(i);
       const y = getY(v);
-      if(!Number.isFinite(x) || !Number.isFinite(y)){ moved = false; continue; }
-
-      points.push({x, y});
-      if(!moved){
-        ctx.moveTo(x, y);
-        moved = true;
-      } else {
-        ctx.lineTo(x, y);
-      }
+      if(!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      validPoints.push({x, y});
     }
-    ctx.stroke();
-    ctx.restore();
 
-    // データポイントに小さな円を描画（デバッグ用、データが少ない場合に視認性向上）
-    if(points.length > 0 && points.length <= 50){
+    // 線を描画（有効なポイント間を連続して繋ぐ）
+    if(validPoints.length >= 2){
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(validPoints[0].x, validPoints[0].y);
+      for(let i=1; i<validPoints.length; i++){
+        ctx.lineTo(validPoints[i].x, validPoints[i].y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    } else if(validPoints.length === 1){
+      // 1点のみの場合は小さな円で表示
       ctx.save();
       ctx.fillStyle = color;
-      for(const pt of points){
-        ctx.beginPath();
-        ctx.arc(pt.x, pt.y, 3, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      ctx.beginPath();
+      ctx.arc(validPoints[0].x, validPoints[0].y, 3, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     }
   }
@@ -817,13 +822,18 @@ function showTooltipForCanvas(e, canvas, data){
 }
 
 /* ========= interactions (shared) ========= */
+function getBaseDates(){
+  return tseDates.length > 0 ? tseDates : globalDates;
+}
+
 function onWheelZoom(e){
   e.preventDefault();
-  if(!globalDates || globalDates.length===0) return;
+  const baseDates = getBaseDates();
+  if(!baseDates || baseDates.length===0) return;
 
   const shrink = (e.deltaY < 0);
   displayCount += (shrink ? -1 : +1);
-  displayCount = Math.max(10, Math.min(displayCount, MAX_DISPLAY, globalDates.length));
+  displayCount = Math.max(10, Math.min(displayCount, MAX_DISPLAY, baseDates.length));
 
   offsetX = 0;
 
@@ -832,7 +842,8 @@ function onWheelZoom(e){
   redrawAll();
 }
 function onMouseDown(e, canvas){
-  if(!globalDates || globalDates.length===0) return;
+  const baseDates = getBaseDates();
+  if(!baseDates || baseDates.length===0) return;
   isDragging = true;
   dragCanvas = canvas;
   dragStartX = e.clientX;
@@ -840,7 +851,8 @@ function onMouseDown(e, canvas){
   document.body.style.cursor = 'grabbing';
 }
 function onMouseMove(e){
-  if(!globalDates || globalDates.length===0) return;
+  const baseDates = getBaseDates();
+  if(!baseDates || baseDates.length===0) return;
 
   if(isDragging){
     const canvas = dragCanvas || idxCanvas;
@@ -850,7 +862,7 @@ function onMouseMove(e){
     const ppc = Math.max(1, usableW / displayCount);
     const moveBars = diffX / ppc;
 
-    const n = globalDates.length;
+    const n = baseDates.length;
     const maxOffset = Math.max(0, n - displayCount);
 
     let newOffset = dragStartOffset + moveBars;
@@ -887,23 +899,56 @@ function rebuildData(){
   // UIの状態を更新（差引累計がある場合は他を無効化）
   updateTseSelectionUI();
 }
+
+// 各チャート用の独立した表示範囲を計算
+function getChartWindow(dates, baseDates){
+  // baseDatesを基準に表示範囲を計算し、datesに適用
+  const n = baseDates.length;
+  const count = Math.max(10, Math.min(displayCount, MAX_DISPLAY, n || 10));
+  const maxOffset = Math.max(0, n - count);
+  const localOffset = Math.max(0, Math.min(Math.round(offsetX), maxOffset));
+  const startRaw = n - count - localOffset;
+  const endRaw = startRaw + count;
+  const start = Math.max(0, startRaw);
+  const end = Math.min(n, endRaw);
+
+  // 基準となる日付範囲を取得
+  const startDate = baseDates[start] || null;
+  const endDate = baseDates[end - 1] || null;
+
+  if(!startDate || !endDate || dates.length === 0){
+    return { visibleDates: [], visibleAbsIndices: [] };
+  }
+
+  // datesから該当範囲の日付を抽出
+  const filteredIndices = [];
+  const filteredDates = [];
+  for(let i = 0; i < dates.length; i++){
+    const d = dates[i];
+    if(d >= startDate && d <= endDate){
+      filteredIndices.push(i);
+      filteredDates.push(d);
+    }
+  }
+
+  return { visibleDates: filteredDates, visibleAbsIndices: filteredIndices };
+}
+
 function redrawAll(){
   rebuildData(); // 累積計算のために毎回再構築
 
-  const globalWindow = getVisibleWindowForDates(globalDates);
-  const resolveWindow = (data, dates) => {
-    const absIndices = mapVisibleDatesToAbsIndices(data && data.dateIndex, globalWindow.visibleDates);
-    const hasAny = absIndices.some((idx) => idx != null);
-    if (hasAny) return { window: globalWindow, absIndices };
-    const localWindow = getVisibleWindowForDates(dates);
-    return { window: localWindow, absIndices: mapVisibleDatesToAbsIndices(data && data.dateIndex, localWindow.visibleDates) };
-  };
+  // 部門別データがメイン: tseDatesを基準にする
+  // 指数データはその範囲に合わせる
+  const baseDates = tseDates.length > 0 ? tseDates : globalDates;
 
-  const idxWindow = resolveWindow(idxData, idxDates);
-  const tseWindow = resolveWindow(tseData, tseDates);
+  // 部門別チャート: tseDatesを基準
+  const tseWindow = getChartWindow(tseDates, baseDates);
 
-  drawChartGeneric(idxCtx, idxCanvas, idxData, idxWindow.window.visibleDates, idxWindow.absIndices);
-  drawChartGeneric(tseCtx, tseCanvas, tseData, tseWindow.window.visibleDates, tseWindow.absIndices);
+  // 指数チャート: 同じ期間だがidxDatesで
+  const idxWindow = getChartWindow(idxDates, baseDates);
+
+  drawChartGeneric(idxCtx, idxCanvas, idxData, idxWindow.visibleDates, idxWindow.visibleAbsIndices);
+  drawChartGeneric(tseCtx, tseCanvas, tseData, tseWindow.visibleDates, tseWindow.visibleAbsIndices);
 }
 
 /* ========= select UI ========= */
@@ -1132,7 +1177,8 @@ async function autoLoad(){
     }
   }
 
-  displayCount = Math.max(10, Math.min(displayCount, MAX_DISPLAY, globalDates.length || displayCount));
+  const baseDatesLoaded = tseDates.length > 0 ? tseDates : globalDates;
+  displayCount = Math.max(10, Math.min(displayCount, MAX_DISPLAY, baseDatesLoaded.length || displayCount));
   offsetX = 0;
   syncCountControls();
   updateTopChips();
