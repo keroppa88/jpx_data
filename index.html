@@ -96,15 +96,20 @@
       width:100%;
       padding:8px 0;
     }
-    #tseSelContainer{
+    #tseSelContainer, #idxSelContainer{
       display:flex;
       gap:8px;
       flex-wrap:wrap;
       align-items:center;
       flex:1;
+      min-width:0;
     }
-    #tseSelContainer.hidden{
+    #tseSelContainer.hidden, #idxSelContainer.hidden{
       display:none;
+    }
+    .selRow .toggle-btn{
+      margin-left:auto;
+      flex-shrink:0;
     }
     .sel{
       display:flex;
@@ -208,6 +213,10 @@
               <input type="checkbox" id="showDateLine" checked style="width:16px; height:16px; accent-color:#2563eb;">
               日付ライン
             </label>
+            <label style="display:flex; align-items:center; gap:4px; margin-left:8px; font-size:12px; cursor:pointer;">
+              <input type="checkbox" id="showFullDate" checked style="width:16px; height:16px; accent-color:#2563eb;">
+              日付表示
+            </label>
           </div>
         </div>
 
@@ -219,10 +228,13 @@
               <div class="legend" id="idxLegend"></div>
             </div>
             <div class="selRow" id="idxSelRow" style="padding:8px 12px;">
-              <div class="sel">
-                <div class="slot">銘柄</div>
-                <select id="idxSel1"></select>
+              <div id="idxSelContainer">
+                <div class="sel">
+                  <div class="slot">銘柄</div>
+                  <select id="idxSel1"></select>
+                </div>
               </div>
+              <button class="toggle-btn" id="idxToggleBtn" title="プルダウンの表示/非表示">－</button>
             </div>
             <div class="canvasBox">
               <canvas id="idxChart"></canvas>
@@ -299,6 +311,7 @@ let globalDates = [];
 let displayCount = 200;
 let offsetX = 0;
 let showDateLine = true;
+let showFullDate = true;
 
 let isDragging = false;
 let dragStartX = 0;
@@ -453,6 +466,14 @@ function bindControls(){
   dateLineCheck.checked = showDateLine;
   dateLineCheck.addEventListener('change', ()=>{
     showDateLine = dateLineCheck.checked;
+    redrawAll();
+  });
+
+  // 日付表示チェックボックス（日/月切替）
+  const fullDateCheck = document.getElementById('showFullDate');
+  fullDateCheck.checked = showFullDate;
+  fullDateCheck.addEventListener('change', ()=>{
+    showFullDate = fullDateCheck.checked;
     redrawAll();
   });
 }
@@ -750,6 +771,38 @@ function calcNiceTicks(minV, maxV, targetCount = 5){
   return ticks;
 }
 
+// 株価指数用のキリのいい数値を計算
+function calcIdxNiceTicks(minV, maxV, targetCount = 5){
+  const range = maxV - minV;
+  if(range === 0) return [minV];
+
+  // キリのいい間隔を計算
+  const niceIntervals = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000];
+  const rawInterval = range / targetCount;
+
+  let bestInterval = niceIntervals[0];
+  for(const ni of niceIntervals){
+    if(ni >= rawInterval){
+      bestInterval = ni;
+      break;
+    }
+    bestInterval = ni;
+  }
+
+  // 開始値をキリのいい数値に
+  const startTick = Math.floor(minV / bestInterval) * bestInterval;
+
+  const ticks = [];
+  for(let t = startTick; t <= maxV + bestInterval * 0.5; t += bestInterval){
+    if(t >= minV - bestInterval * 0.5){
+      ticks.push(t);
+    }
+    if(ticks.length > 10) break;
+  }
+
+  return ticks;
+}
+
 function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, isTseChart = false){
   const w=canvas.width, h=canvas.height;
   const pad={t:14,b:28,l:12,r:90};
@@ -807,14 +860,18 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, is
 
   const range=(maxV-minV)||1;
 
-  // 部門別チャートの場合はキリのいい数値で範囲を設定
+  // 両チャートともキリのいい数値で範囲を設定
   let plotMinV, plotMaxV;
   let ticks = [];
   if(isTseChart){
-    ticks = calcNiceTicks(minV, maxV, 5);
+    ticks = calcNiceTicks(minV, maxV, 4);
+  } else {
+    ticks = calcIdxNiceTicks(minV, maxV, 4);
+  }
+
+  if(ticks.length >= 2){
     plotMinV = ticks[0];
     plotMaxV = ticks[ticks.length - 1];
-    // 範囲を少し広げる
     const tickRange = plotMaxV - plotMinV;
     plotMinV -= tickRange * 0.02;
     plotMaxV += tickRange * 0.02;
@@ -827,26 +884,45 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, is
   const getX=(i)=>pad.l+(i+0.5)*(chartW/visibleDates.length);
   const getY=(val)=>pad.t+chartH-(val-plotMinV)*scaleY;
 
-  ctx.strokeStyle='#eef0f3'; ctx.lineWidth=1;
+  // グリッド線と補助線を描画
+  if(ticks.length >= 2){
+    const tickInterval = ticks[1] - ticks[0];
 
-  if(isTseChart && ticks.length > 0){
-    // 部門別チャート：キリのいい数値でグリッド線
-    for(const t of ticks){
+    // メイングリッド線（5本）と補助線
+    for(let i = 0; i < ticks.length; i++){
+      const t = ticks[i];
       const y = getY(t);
+
+      // メイングリッド線
+      ctx.strokeStyle='#e0e0e0';
+      ctx.lineWidth=1;
       ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
+
+      // 価格ラベル
       ctx.fillStyle='#9aa1ab'; ctx.textAlign='left';
-      const formattedVal = formatTseAxisValue(t);
+      const formattedVal = isTseChart ? formatTseAxisValue(t) : formatIdxAxisValue(t);
       ctx.fillText(formattedVal, w-pad.r+6, y+4);
+
+      // 補助線（次のティックとの間に1本）
+      if(i < ticks.length - 1){
+        const midY = getY(t + tickInterval / 2);
+        ctx.strokeStyle='#f0f0f0';
+        ctx.lineWidth=1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(pad.l, midY); ctx.lineTo(w-pad.r, midY); ctx.stroke();
+        ctx.setLineDash([]);
+      }
     }
   } else {
-    // 株価指数チャート：従来通り
-    const gridSteps=5;
+    // フォールバック
+    const gridSteps=4;
     for(let i=0;i<=gridSteps;i++){
       const y=pad.t+(chartH*i/gridSteps);
       const v=plotMaxV-(plotMaxV-plotMinV)*(i/gridSteps);
+      ctx.strokeStyle='#e0e0e0'; ctx.lineWidth=1;
       ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
       ctx.fillStyle='#9aa1ab'; ctx.textAlign='left';
-      const formattedVal = formatAxisValue(v);
+      const formattedVal = isTseChart ? formatTseAxisValue(v) : formatIdxAxisValue(v);
       ctx.fillText(formattedVal, w-pad.r+6, y+4);
     }
   }
@@ -863,10 +939,18 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, is
         ctx.moveTo(x, pad.t);
         ctx.lineTo(x, h-pad.b);
         ctx.stroke();
-        // 日付ラベル
+        // 日付ラベル（showFullDateがfalseなら月表示のみ）
+        let displayDate = d;
+        if(!showFullDate && d){
+          // YYYY-MM-DD形式からYYYY-MMに変換
+          const parts = d.split('-');
+          if(parts.length >= 2){
+            displayDate = parts[0] + '-' + parts[1];
+          }
+        }
         ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--axisDark').trim() || '#6b7280';
         ctx.textAlign='center';
-        ctx.fillText(d, x, h-6);
+        ctx.fillText(displayDate, x, h-6);
       }
     });
   }
@@ -933,6 +1017,27 @@ function formatAxisValue(v){
     return (v / 1e8).toFixed(1) + "億";
   } else if(absV >= 1e4){
     return (v / 1e4).toFixed(0) + "万";
+  } else {
+    return v.toFixed(0);
+  }
+}
+
+// 株価指数用：日経平均等の表示を改良（5万5000形式）
+function formatIdxAxisValue(v){
+  const absV = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+
+  if(absV >= 10000){
+    // 1万以上：○万○○○○形式
+    const man = Math.floor(absV / 10000);
+    const remainder = Math.round(absV % 10000);
+    if(remainder === 0){
+      return sign + man + "万";
+    }
+    return sign + man + "万" + remainder;
+  } else if(absV >= 1000){
+    // 1000以上：そのまま表示
+    return Math.round(v).toLocaleString();
   } else {
     return v.toFixed(0);
   }
@@ -1482,6 +1587,14 @@ function init(){
     c.addEventListener("mouseleave", onMouseLeave);
   }
   window.addEventListener("mouseup", onMouseUp);
+
+  // 株価指数プルダウンの表示/非表示トグル
+  const idxToggleBtn = document.getElementById("idxToggleBtn");
+  const idxSelContainer = document.getElementById("idxSelContainer");
+  idxToggleBtn.addEventListener("click", ()=>{
+    const isHidden = idxSelContainer.classList.toggle("hidden");
+    idxToggleBtn.textContent = isHidden ? "＋" : "－";
+  });
 
   // 部門別プルダウンの表示/非表示トグル
   const tseToggleBtn = document.getElementById("tseToggleBtn");
