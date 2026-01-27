@@ -129,6 +129,24 @@
       cursor:pointer;
       background:none;
     }
+    .show-check{
+      width:18px;
+      height:18px;
+      margin-left:4px;
+      cursor:pointer;
+      accent-color:#2563eb;
+    }
+    .sel.disabled{
+      opacity:0.4;
+      pointer-events:none;
+    }
+    .sel.disabled select,
+    .sel.disabled .color-picker{
+      pointer-events:none;
+    }
+    .sel.disabled .show-check{
+      pointer-events:auto;
+    }
 
     .canvasBox{ position:relative; background:#fff; }
     canvas{ display:block; width:100%; cursor:crosshair; }
@@ -196,14 +214,14 @@
               <div class="legend" id="tseLegend"></div>
             </div>
             <div class="selRow" id="tseSelRow" style="padding:8px 12px;">
-              <div class="sel"><div class="slot">1</div><select id="tseSel1"></select><input type="color" class="color-picker" id="tseColor1" value="#FF4B00"></div>
-              <div class="sel"><div class="slot">2</div><select id="tseSel2"></select><input type="color" class="color-picker" id="tseColor2" value="#005AFF"></div>
-              <div class="sel"><div class="slot">3</div><select id="tseSel3"></select><input type="color" class="color-picker" id="tseColor3" value="#03AF7A"></div>
-              <div class="sel"><div class="slot">4</div><select id="tseSel4"></select><input type="color" class="color-picker" id="tseColor4" value="#4DC4FF"></div>
-              <div class="sel"><div class="slot">5</div><select id="tseSel5"></select><input type="color" class="color-picker" id="tseColor5" value="#F6AA00"></div>
-              <div class="sel"><div class="slot">6</div><select id="tseSel6"></select><input type="color" class="color-picker" id="tseColor6" value="#990099"></div>
-              <div class="sel"><div class="slot">7</div><select id="tseSel7"></select><input type="color" class="color-picker" id="tseColor7" value="#84919E"></div>
-              <div class="sel"><div class="slot">8</div><select id="tseSel8"></select><input type="color" class="color-picker" id="tseColor8" value="#000000"></div>
+              <div class="sel"><div class="slot">1</div><select id="tseSel1"></select><input type="color" class="color-picker" id="tseColor1" value="#FF4B00"><input type="checkbox" class="show-check" id="tseCheck1" checked title="表示/非表示"></div>
+              <div class="sel"><div class="slot">2</div><select id="tseSel2"></select><input type="color" class="color-picker" id="tseColor2" value="#005AFF"><input type="checkbox" class="show-check" id="tseCheck2" checked title="表示/非表示"></div>
+              <div class="sel"><div class="slot">3</div><select id="tseSel3"></select><input type="color" class="color-picker" id="tseColor3" value="#03AF7A"><input type="checkbox" class="show-check" id="tseCheck3" checked title="表示/非表示"></div>
+              <div class="sel"><div class="slot">4</div><select id="tseSel4"></select><input type="color" class="color-picker" id="tseColor4" value="#4DC4FF"><input type="checkbox" class="show-check" id="tseCheck4" checked title="表示/非表示"></div>
+              <div class="sel"><div class="slot">5</div><select id="tseSel5"></select><input type="color" class="color-picker" id="tseColor5" value="#F6AA00"><input type="checkbox" class="show-check" id="tseCheck5" checked title="表示/非表示"></div>
+              <div class="sel"><div class="slot">6</div><select id="tseSel6"></select><input type="color" class="color-picker" id="tseColor6" value="#990099"><input type="checkbox" class="show-check" id="tseCheck6" checked title="表示/非表示"></div>
+              <div class="sel"><div class="slot">7</div><select id="tseSel7"></select><input type="color" class="color-picker" id="tseColor7" value="#84919E"><input type="checkbox" class="show-check" id="tseCheck7" checked title="表示/非表示"></div>
+              <div class="sel"><div class="slot">8</div><select id="tseSel8"></select><input type="color" class="color-picker" id="tseColor8" value="#000000"><input type="checkbox" class="show-check" id="tseCheck8" checked title="表示/非表示"></div>
             </div>
             <div class="canvasBox">
               <canvas id="tseChart"></canvas>
@@ -269,6 +287,7 @@ let tseAvail = [];
 let idxKey = "";
 let tseKeys = new Array(TSE_SELECTION_COUNT).fill("");
 let tseColors = [...DEFAULT_COLORS];
+let tseVisible = new Array(TSE_SELECTION_COUNT).fill(true);
 
 let idxData = null;
 let tseData = null;
@@ -531,14 +550,23 @@ function buildIdxSeries(rows, key, dates){
   return { dates, series: [{ label: key, color: "#2563eb", width: 2, values }] };
 }
 
-function buildTseSeries(rows, keys, colors, dates){
+function buildTseSeries(rows, keys, colors, dates, visible){
   const series = [];
+
+  // 差引累計が1つでも選択されているかチェック
+  const hasCumulative = keys.some((k, i) => k && k.endsWith("_差引累計") && visible[i]);
+
   for(let i=0;i<keys.length;i++){
     const k = keys[i];
     if(!k) continue;
+    if(!visible[i]) continue; // チェックが外れていたらスキップ
 
     // 累積計算かどうかをチェック
     const isCumulative = k.endsWith("_差引累計");
+
+    // 差引累計がある場合、差引累計以外はスキップ
+    if(hasCumulative && !isCumulative) continue;
+
     const baseKey = isCumulative ? k.replace("_差引累計", "_差引") : k;
 
     const map = new Map();
@@ -561,7 +589,7 @@ function buildTseSeries(rows, keys, colors, dates){
       values = dates.map(d => (map.has(d) ? map.get(d) : null));
     }
 
-    series.push({ label: k, color: colors[i] || DEFAULT_COLORS[i % DEFAULT_COLORS.length], width: 2, values, isCumulative });
+    series.push({ label: k, color: colors[i] || DEFAULT_COLORS[i % DEFAULT_COLORS.length], width: 2, values, isCumulative, slotIndex: i });
   }
   return { dates, series };
 }
@@ -678,21 +706,54 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices){
   }));
   canvas.seriesOffsets = seriesOffsets;
 
+  // 各系列を描画
   for(let si=0; si<data.series.length; si++){
     const s = data.series[si];
-    ctx.strokeStyle=s.color;
-    ctx.lineWidth=s.width;
+    const color = s.color || '#000000';
+    const lineWidth = s.width || 2;
+
+    // 線を描画
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     ctx.beginPath();
-    let moved=false;
+
+    let moved = false;
+    const points = []; // 後で点を描画するために座標を保存
+
     for(let i=0; i<visibleAbsIndices.length; i++){
       const absIdx = visibleAbsIndices[i];
-      if(absIdx==null){ moved=false; continue; }
+      if(absIdx == null){ moved = false; continue; }
       const v = getValue(s, absIdx, si);
-      if(v==null){ moved=false; continue; }
-      const x=getX(i), y=getY(v);
-      if(!moved){ ctx.moveTo(x,y); moved=true; } else ctx.lineTo(x,y);
+      if(v == null || !Number.isFinite(v)){ moved = false; continue; }
+      const x = getX(i);
+      const y = getY(v);
+      if(!Number.isFinite(x) || !Number.isFinite(y)){ moved = false; continue; }
+
+      points.push({x, y});
+      if(!moved){
+        ctx.moveTo(x, y);
+        moved = true;
+      } else {
+        ctx.lineTo(x, y);
+      }
     }
     ctx.stroke();
+    ctx.restore();
+
+    // データポイントに小さな円を描画（デバッグ用、データが少ない場合に視認性向上）
+    if(points.length > 0 && points.length <= 50){
+      ctx.save();
+      ctx.fillStyle = color;
+      for(const pt of points){
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
   }
 }
 
@@ -817,11 +878,14 @@ function rebuildData(){
   idxData.dateIndex = buildDateIndex(idxDates);
 
   // 部門別データ
-  tseData = buildTseSeries(tseRows, tseKeys, tseColors, tseDates);
+  tseData = buildTseSeries(tseRows, tseKeys, tseColors, tseDates, tseVisible);
   tseData.dateIndex = buildDateIndex(tseDates);
 
   renderLegend("idxLegend", idxData);
   renderLegend("tseLegend", tseData);
+
+  // UIの状態を更新（差引累計がある場合は他を無効化）
+  updateTseSelectionUI();
 }
 function redrawAll(){
   rebuildData(); // 累積計算のために毎回再構築
@@ -843,6 +907,33 @@ function redrawAll(){
 }
 
 /* ========= select UI ========= */
+function updateTseSelectionUI(){
+  // 差引累計が1つでも選択・表示されているかチェック
+  const hasCumulative = tseKeys.some((k, i) => k && k.endsWith("_差引累計") && tseVisible[i]);
+
+  for(let i=0; i<TSE_SELECTION_COUNT; i++){
+    const sel = document.getElementById(`tseSel${i+1}`);
+    const colorPicker = document.getElementById(`tseColor${i+1}`);
+    const checkbox = document.getElementById(`tseCheck${i+1}`);
+    const selDiv = sel ? sel.closest('.sel') : null;
+
+    if(!sel || !checkbox || !selDiv) continue;
+
+    const k = tseKeys[i];
+    const isCumulative = k && k.endsWith("_差引累計");
+
+    // チェックボックスの状態を更新
+    checkbox.checked = tseVisible[i];
+
+    // 差引累計がある場合、差引累計以外は無効化表示
+    if(hasCumulative && k && !isCumulative){
+      selDiv.classList.add('disabled');
+    } else {
+      selDiv.classList.remove('disabled');
+    }
+  }
+}
+
 function fillIdxSelect(selectEl, names, current){
   selectEl.innerHTML = "";
   const optEmpty = document.createElement("option");
@@ -904,19 +995,30 @@ function bindSelects(){
   for(let i=0; i<TSE_SELECTION_COUNT; i++){
     const sel = document.getElementById(`tseSel${i+1}`);
     const colorPicker = document.getElementById(`tseColor${i+1}`);
+    const checkbox = document.getElementById(`tseCheck${i+1}`);
 
     fillTseSelect(sel, tseAvail, tseKeys[i]);
     colorPicker.value = tseColors[i];
+    checkbox.checked = tseVisible[i];
 
     sel.addEventListener("change", ()=>{
       tseKeys[i] = sel.value || "";
+      // 何かを選択したら表示をONにする
+      if(tseKeys[i]) tseVisible[i] = true;
       try{ localStorage.setItem("tseKeys_v2", JSON.stringify(tseKeys)); }catch(e){}
+      try{ localStorage.setItem("tseVisible_v1", JSON.stringify(tseVisible)); }catch(e){}
       redrawAll();
     });
 
     colorPicker.addEventListener("input", ()=>{
       tseColors[i] = colorPicker.value;
       try{ localStorage.setItem("tseColors_v1", JSON.stringify(tseColors)); }catch(e){}
+      redrawAll();
+    });
+
+    checkbox.addEventListener("change", ()=>{
+      tseVisible[i] = checkbox.checked;
+      try{ localStorage.setItem("tseVisible_v1", JSON.stringify(tseVisible)); }catch(e){}
       redrawAll();
     });
   }
@@ -992,6 +1094,16 @@ async function autoLoad(){
       const arr = JSON.parse(raw);
       if(Array.isArray(arr)){
         tseColors = new Array(TSE_SELECTION_COUNT).fill("").map((_, i)=> arr[i] || DEFAULT_COLORS[i]);
+      }
+    }
+  }catch(e){}
+
+  try{
+    const raw = localStorage.getItem("tseVisible_v1");
+    if(raw){
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr)){
+        tseVisible = new Array(TSE_SELECTION_COUNT).fill(true).map((_, i)=> arr[i] !== false);
       }
     }
   }catch(e){}
