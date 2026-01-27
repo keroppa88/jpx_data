@@ -1110,7 +1110,7 @@ function bindSelects(){
   fillIdxSelect(idxSel, idxAvail, idxKey);
   idxSel.addEventListener("change", ()=>{
     idxKey = idxSel.value || "";
-    try{ localStorage.setItem("idxKey_v3", idxKey); }catch(e){}
+    try{ localStorage.setItem("idxKey_v4", idxKey); }catch(e){}
     redrawAll();
   });
 
@@ -1138,8 +1138,8 @@ function bindSelects(){
       tseKeys[i] = sel.value || "";
       // 何かを選択したら表示をONにする
       if(tseKeys[i]) tseVisible[i] = true;
-      try{ localStorage.setItem("tseKeys_v2", JSON.stringify(tseKeys)); }catch(e){}
-      try{ localStorage.setItem("tseVisible_v1", JSON.stringify(tseVisible)); }catch(e){}
+      try{ localStorage.setItem("tseKeys_v3", JSON.stringify(tseKeys)); }catch(e){}
+      try{ localStorage.setItem("tseVisible_v2", JSON.stringify(tseVisible)); }catch(e){}
       // 選択後の表示をプレフィックスなしに更新
       updateSelectDisplay(sel);
       redrawAll();
@@ -1147,13 +1147,13 @@ function bindSelects(){
 
     colorPicker.addEventListener("input", ()=>{
       tseColors[i] = colorPicker.value;
-      try{ localStorage.setItem("tseColors_v1", JSON.stringify(tseColors)); }catch(e){}
+      try{ localStorage.setItem("tseColors_v2", JSON.stringify(tseColors)); }catch(e){}
       redrawAll();
     });
 
     checkbox.addEventListener("change", ()=>{
       tseVisible[i] = checkbox.checked;
-      try{ localStorage.setItem("tseVisible_v1", JSON.stringify(tseVisible)); }catch(e){}
+      try{ localStorage.setItem("tseVisible_v2", JSON.stringify(tseVisible)); }catch(e){}
       redrawAll();
     });
   }
@@ -1227,14 +1227,14 @@ async function autoLoad(){
 
   // restore selections
   try{
-    const raw = localStorage.getItem("idxKey_v3");
+    const raw = localStorage.getItem("idxKey_v4");
     if(raw && idxAvail.includes(raw)){
       idxKey = raw;
     }
   }catch(e){}
 
   try{
-    const raw = localStorage.getItem("tseKeys_v2");
+    const raw = localStorage.getItem("tseKeys_v3");
     if(raw){
       const arr = JSON.parse(raw);
       if(Array.isArray(arr)){
@@ -1244,7 +1244,7 @@ async function autoLoad(){
   }catch(e){}
 
   try{
-    const raw = localStorage.getItem("tseColors_v1");
+    const raw = localStorage.getItem("tseColors_v2");
     if(raw){
       const arr = JSON.parse(raw);
       if(Array.isArray(arr)){
@@ -1254,7 +1254,7 @@ async function autoLoad(){
   }catch(e){}
 
   try{
-    const raw = localStorage.getItem("tseVisible_v1");
+    const raw = localStorage.getItem("tseVisible_v2");
     if(raw){
       const arr = JSON.parse(raw);
       if(Array.isArray(arr)){
