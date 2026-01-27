@@ -108,7 +108,8 @@
       display:none;
     }
     .selRow .toggle-btn{
-      margin-left:auto;
+      margin-left:8px;
+      margin-right:4px;
       flex-shrink:0;
     }
     .sel{
@@ -189,6 +190,81 @@
       box-shadow:0 8px 22px rgba(0,0,0,0.18);
       z-index:1000; line-height:1.45; white-space:nowrap;
     }
+
+    .help-btn{
+      padding:6px 12px;
+      border:1px solid #cfd4dc;
+      border-radius:8px;
+      background:#fff;
+      font-size:12px;
+      cursor:pointer;
+      color:#374151;
+      margin-left:12px;
+    }
+    .help-btn:hover{
+      background:#f3f4f6;
+    }
+
+    .modal-overlay{
+      position:fixed;
+      top:0; left:0; right:0; bottom:0;
+      background:rgba(0,0,0,0.5);
+      display:none;
+      justify-content:center;
+      align-items:center;
+      z-index:2000;
+    }
+    .modal-overlay.show{
+      display:flex;
+    }
+    .modal-content{
+      background:#fff;
+      border-radius:12px;
+      padding:20px 24px;
+      max-width:500px;
+      width:90%;
+      box-shadow:0 10px 40px rgba(0,0,0,0.2);
+    }
+    .modal-header{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:16px;
+    }
+    .modal-title{
+      font-weight:700;
+      font-size:16px;
+      color:#111827;
+    }
+    .modal-close{
+      background:none;
+      border:none;
+      font-size:24px;
+      cursor:pointer;
+      color:#6b7280;
+      line-height:1;
+    }
+    .modal-close:hover{
+      color:#111827;
+    }
+    .modal-body{
+      font-size:13px;
+      line-height:1.7;
+      color:#374151;
+    }
+    .modal-body p{
+      margin:0 0 10px 0;
+    }
+    .modal-body a{
+      color:#2563eb;
+      word-break:break-all;
+    }
+    .modal-body .section-title{
+      font-weight:700;
+      margin-top:16px;
+      margin-bottom:8px;
+      color:#111827;
+    }
   </style>
 </head>
 <body>
@@ -218,6 +294,7 @@
               日付表示
             </label>
           </div>
+          <button class="help-btn" id="helpBtn">説明</button>
         </div>
 
         <div class="grid2">
@@ -269,6 +346,26 @@
     </div>
 
     <div id="tooltip" class="tooltip"></div>
+
+    <!-- 説明モーダル -->
+    <div id="helpModal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div class="modal-title">説明</div>
+          <button class="modal-close" id="modalClose">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p>JPXが発表する投資部門別売買動向をAPIで取得しています。</p>
+          <p><strong>更新タイミング</strong><br>
+          投資部門別情報・週次の第4営業日＝木曜日の18:00頃<br>
+          通常は木曜日、祝日等非営業日がある場合はその分後ろ倒し。</p>
+          <p>連休等により通常と異なる公表スケジュールとなる場合は<a href="https://www.jpx.co.jp/markets/statistics-equities/investor-type/index.html" target="_blank">こちら</a>をご確認ください。</p>
+          <div class="section-title">各項目定義</div>
+          <p>総計＝自己＋委託<br>
+          委託＝自己以外の全て</p>
+        </div>
+      </div>
+    </div>
   </div>
 
 <script>
@@ -734,9 +831,10 @@ function renderLegend(elId, data){
 }
 
 // キリのいい数値を計算（部門別売買動向用、千円単位）
+// 折れ線最大値 < 縦軸最大値 を保証
 function calcNiceTicks(minV, maxV, targetCount = 5){
   const range = maxV - minV;
-  if(range === 0) return [minV];
+  if(range === 0) return [minV, minV];
 
   // 億円単位での範囲
   const rangeOku = range / 1e5;
@@ -757,24 +855,30 @@ function calcNiceTicks(minV, maxV, targetCount = 5){
   // 千円単位に戻す
   const interval = bestInterval * 1e5;
 
-  // 開始値をキリのいい数値に
+  // 開始値をキリのいい数値に（minVを含むか下回る）
   const startTick = Math.floor(minV / interval) * interval;
+  // 終了値をキリのいい数値に（maxVを必ず超える）
+  const endTick = Math.ceil(maxV / interval) * interval;
 
   const ticks = [];
-  for(let t = startTick; t <= maxV + interval * 0.5; t += interval){
-    if(t >= minV - interval * 0.5){
-      ticks.push(t);
-    }
+  for(let t = startTick; t <= endTick; t += interval){
+    ticks.push(t);
     if(ticks.length > 10) break;
+  }
+
+  // 最後のtickがmaxVを超えていることを保証
+  if(ticks.length > 0 && ticks[ticks.length - 1] < maxV){
+    ticks.push(ticks[ticks.length - 1] + interval);
   }
 
   return ticks;
 }
 
 // 株価指数用のキリのいい数値を計算
+// 折れ線最大値 < 縦軸最大値 を保証
 function calcIdxNiceTicks(minV, maxV, targetCount = 5){
   const range = maxV - minV;
-  if(range === 0) return [minV];
+  if(range === 0) return [minV, minV];
 
   // キリのいい間隔を計算
   const niceIntervals = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000];
@@ -789,15 +893,20 @@ function calcIdxNiceTicks(minV, maxV, targetCount = 5){
     bestInterval = ni;
   }
 
-  // 開始値をキリのいい数値に
+  // 開始値をキリのいい数値に（minVを含むか下回る）
   const startTick = Math.floor(minV / bestInterval) * bestInterval;
+  // 終了値をキリのいい数値に（maxVを必ず超える）
+  const endTick = Math.ceil(maxV / bestInterval) * bestInterval;
 
   const ticks = [];
-  for(let t = startTick; t <= maxV + bestInterval * 0.5; t += bestInterval){
-    if(t >= minV - bestInterval * 0.5){
-      ticks.push(t);
-    }
+  for(let t = startTick; t <= endTick; t += bestInterval){
+    ticks.push(t);
     if(ticks.length > 10) break;
+  }
+
+  // 最後のtickがmaxVを超えていることを保証
+  if(ticks.length > 0 && ticks[ticks.length - 1] < maxV){
+    ticks.push(ticks[ticks.length - 1] + bestInterval);
   }
 
   return ticks;
@@ -1602,6 +1711,23 @@ function init(){
   tseToggleBtn.addEventListener("click", ()=>{
     const isHidden = tseSelContainer.classList.toggle("hidden");
     tseToggleBtn.textContent = isHidden ? "＋" : "－";
+  });
+
+  // 説明モーダル
+  const helpBtn = document.getElementById("helpBtn");
+  const helpModal = document.getElementById("helpModal");
+  const modalClose = document.getElementById("modalClose");
+
+  helpBtn.addEventListener("click", ()=>{
+    helpModal.classList.add("show");
+  });
+  modalClose.addEventListener("click", ()=>{
+    helpModal.classList.remove("show");
+  });
+  helpModal.addEventListener("click", (e)=>{
+    if(e.target === helpModal){
+      helpModal.classList.remove("show");
+    }
   });
 
   autoLoad().catch(err=>{
