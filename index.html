@@ -531,7 +531,7 @@ function buildIdxSeries(rows, key, dates){
   return { dates, series: [{ label: key, color: "#2563eb", width: 2, values }] };
 }
 
-function buildTseSeries(rows, keys, colors, dates, visibleStartIndex, visibleEndIndex){
+function buildTseSeries(rows, keys, colors, dates){
   const series = [];
   for(let i=0;i<keys.length;i++){
     const k = keys[i];
@@ -546,30 +546,22 @@ function buildTseSeries(rows, keys, colors, dates, visibleStartIndex, visibleEnd
 
     let values;
     if(isCumulative){
-      // 表示期間の開始を0として累積計算
+      // 全範囲で累積計算（描画時に表示範囲でオフセット調整）
       values = [];
       let cumulative = 0;
       for(let j=0; j<dates.length; j++){
         const d = dates[j];
         const v = map.has(d) ? map.get(d) : null;
-        if(j < visibleStartIndex){
-          // 表示範囲外は計算しない（後で0から始めるため）
-          values.push(null);
-        } else {
-          if(j === visibleStartIndex){
-            cumulative = 0; // 表示期間の開始を0にリセット
-          }
-          if(v !== null){
-            cumulative += v;
-          }
-          values.push(cumulative);
+        if(v !== null){
+          cumulative += v;
         }
+        values.push(cumulative);
       }
     } else {
       values = dates.map(d => (map.has(d) ? map.get(d) : null));
     }
 
-    series.push({ label: k, color: colors[i] || DEFAULT_COLORS[i % DEFAULT_COLORS.length], width: 2, values });
+    series.push({ label: k, color: colors[i] || DEFAULT_COLORS[i % DEFAULT_COLORS.length], width: 2, values, isCumulative });
   }
   return { dates, series };
 }
@@ -612,13 +604,34 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices){
     return;
   }
 
+  // 累積データのオフセットを計算（表示範囲の最初の有効な値を0とする）
+  const seriesOffsets = data.series.map(s => {
+    if(!s.isCumulative) return 0;
+    for(let i=0; i<visibleAbsIndices.length; i++){
+      const absIdx = visibleAbsIndices[i];
+      if(absIdx != null && s.values[absIdx] != null && !Number.isNaN(s.values[absIdx])){
+        return s.values[absIdx];
+      }
+    }
+    return 0;
+  });
+
+  // 値取得関数（累積の場合はオフセット調整）
+  const getValue = (s, absIdx, seriesIdx) => {
+    const v = s.values[absIdx];
+    if(v == null || Number.isNaN(v)) return null;
+    if(s.isCumulative) return v - seriesOffsets[seriesIdx];
+    return v;
+  };
+
   let minV=Infinity, maxV=-Infinity;
-  for(const s of data.series){
+  for(let si=0; si<data.series.length; si++){
+    const s = data.series[si];
     for(let i=0; i<visibleAbsIndices.length; i++){
       const absIdx = visibleAbsIndices[i];
       if(absIdx==null) continue;
-      const v=s.values[absIdx];
-      if(v==null || Number.isNaN(v)) continue;
+      const v = getValue(s, absIdx, si);
+      if(v==null) continue;
       minV=Math.min(minV,v); maxV=Math.max(maxV,v);
     }
   }
@@ -656,14 +669,17 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices){
     }
   });
 
+  // ツールチップ用にオフセット情報も保存
   canvas.pointPositions = visibleDates.map((d,i)=>({
     x:getX(i),
     w:chartW/visibleDates.length,
     absIndex:visibleAbsIndices[i],
     date:d
   }));
+  canvas.seriesOffsets = seriesOffsets;
 
-  for(const s of data.series){
+  for(let si=0; si<data.series.length; si++){
+    const s = data.series[si];
     ctx.strokeStyle=s.color;
     ctx.lineWidth=s.width;
     ctx.beginPath();
@@ -671,8 +687,8 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices){
     for(let i=0; i<visibleAbsIndices.length; i++){
       const absIdx = visibleAbsIndices[i];
       if(absIdx==null){ moved=false; continue; }
-      const v=s.values[absIdx];
-      if(v==null || Number.isNaN(v)){ moved=false; continue; }
+      const v = getValue(s, absIdx, si);
+      if(v==null){ moved=false; continue; }
       const x=getX(i), y=getY(v);
       if(!moved){ ctx.moveTo(x,y); moved=true; } else ctx.lineTo(x,y);
     }
@@ -719,9 +735,15 @@ function showTooltipForCanvas(e, canvas, data){
   }
   const absIdx = p.absIndex;
   const date = p.date || (absIdx!=null ? data.dates[absIdx] : "") || "";
+  const offsets = canvas.seriesOffsets || [];
   let html = `<strong>${date}</strong><br>`;
-  for(const s of data.series){
-    const val = (absIdx!=null ? s.values[absIdx] : null);
+  for(let si=0; si<data.series.length; si++){
+    const s = data.series[si];
+    let val = (absIdx!=null ? s.values[absIdx] : null);
+    // 累積データの場合はオフセット調整
+    if(val != null && s.isCumulative && offsets[si] != null){
+      val = val - offsets[si];
+    }
     html += `<span style="color:${s.color}; font-weight:700;">${s.label}</span>: ${fmt(val)}<br>`;
   }
   tooltip.innerHTML = html;
@@ -794,11 +816,8 @@ function rebuildData(){
   idxData = buildIdxSeries(idxRows, idxKey, idxDates);
   idxData.dateIndex = buildDateIndex(idxDates);
 
-  // 部門別データ（表示範囲を考慮して累積計算）
-  const globalWindow = getVisibleWindowForDates(globalDates);
-  // tseDatesでのstartIndex/endIndexを計算
-  const tseWindow = getVisibleWindowForDates(tseDates);
-  tseData = buildTseSeries(tseRows, tseKeys, tseColors, tseDates, tseWindow.startIndex, tseWindow.endIndex);
+  // 部門別データ
+  tseData = buildTseSeries(tseRows, tseKeys, tseColors, tseDates);
   tseData.dateIndex = buildDateIndex(tseDates);
 
   renderLegend("idxLegend", idxData);
