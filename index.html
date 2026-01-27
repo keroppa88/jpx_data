@@ -1072,6 +1072,8 @@ function fillTseSelect(selectEl, names, current){
     const keyName = extractKeyFromDisplayName(n);
     opt.value = keyName;
     opt.textContent = n; // プレフィックス付きの表示名
+    opt.dataset.fullName = n; // 元のプレフィックス付き名前を保存
+    opt.dataset.shortName = keyName; // プレフィックスなしの名前を保存
 
     if(currentOptGroup){
       currentOptGroup.appendChild(opt);
@@ -1081,6 +1083,25 @@ function fillTseSelect(selectEl, names, current){
   }
 
   selectEl.value = current || "";
+  // 選択後の表示をプレフィックスなしに更新
+  updateSelectDisplay(selectEl);
+}
+
+// 選択されたオプションの表示をプレフィックスなしに変更する
+function updateSelectDisplay(selectEl){
+  const selectedOpt = selectEl.options[selectEl.selectedIndex];
+  if(selectedOpt && selectedOpt.dataset.shortName){
+    selectedOpt.textContent = selectedOpt.dataset.shortName;
+  }
+}
+
+// プルダウンを開くときに全オプションの表示をプレフィックス付きに戻す
+function restoreSelectDisplay(selectEl){
+  for(const opt of selectEl.options){
+    if(opt.dataset.fullName){
+      opt.textContent = opt.dataset.fullName;
+    }
+  }
 }
 
 function bindSelects(){
@@ -1103,12 +1124,24 @@ function bindSelects(){
     colorPicker.value = tseColors[i];
     checkbox.checked = tseVisible[i];
 
+    // プルダウンを開くときにプレフィックス付きの表示に戻す
+    sel.addEventListener("focus", ()=>{
+      restoreSelectDisplay(sel);
+    });
+
+    // プルダウンを閉じるときにプレフィックスなしの表示に変更
+    sel.addEventListener("blur", ()=>{
+      updateSelectDisplay(sel);
+    });
+
     sel.addEventListener("change", ()=>{
       tseKeys[i] = sel.value || "";
       // 何かを選択したら表示をONにする
       if(tseKeys[i]) tseVisible[i] = true;
       try{ localStorage.setItem("tseKeys_v2", JSON.stringify(tseKeys)); }catch(e){}
       try{ localStorage.setItem("tseVisible_v1", JSON.stringify(tseVisible)); }catch(e){}
+      // 選択後の表示をプレフィックスなしに更新
+      updateSelectDisplay(sel);
       redrawAll();
     });
 
@@ -1231,25 +1264,39 @@ async function autoLoad(){
   }catch(e){}
 
   // デフォルト値設定
-  if(!idxKey && idxAvail[0]) idxKey = idxAvail[0];
+  // 株価指数のデフォルト: TOPIX終値
+  if(!idxKey){
+    if(idxAvail.includes("TOPIX終値")){
+      idxKey = "TOPIX終値";
+    } else if(idxAvail[0]){
+      idxKey = idxAvail[0];
+    }
+  }
 
-  // 部門別のデフォルト：海外投資家_差引累計、個人_差引累計など
+  // 部門別のデフォルト：自己計、個人、海外投資家、投資信託、金融、法人の差引累計
   const defaultTseKeys = [
-    "海外投資家_差引累計",
+    "自己計_差引累計",
     "個人_差引累計",
-    "信託銀行_差引累計",
+    "海外投資家_差引累計",
     "投資信託_差引累計",
-    "事業法人_差引累計",
-    "",
+    "金融_差引累計",
+    "法人_差引累計",
     "",
     ""
   ];
   for(let i=0; i<TSE_SELECTION_COUNT; i++){
     if(!tseKeys[i] && defaultTseKeys[i]) {
-      // 累計の場合、ベースとなる差引が存在するかチェック
-      const baseKey = defaultTseKeys[i].replace("_差引累計", "_差引");
-      if(tseAvail.includes(baseKey)){
-        tseKeys[i] = defaultTseKeys[i];
+      const key = defaultTseKeys[i];
+      // 合成項目（金融_差引累計、法人_差引累計）の場合は直接設定
+      if(COMPOSITE_FIELDS.hasOwnProperty(key)){
+        tseKeys[i] = key;
+      } else {
+        // 累計の場合、ベースとなる差引が存在するかチェック
+        const baseKey = key.replace("_差引累計", "_差引");
+        const tseNamesFromData = uniqSorted(tseRows.map(r => r.name));
+        if(tseNamesFromData.includes(baseKey)){
+          tseKeys[i] = key;
+        }
       }
     }
   }
