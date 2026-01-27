@@ -793,6 +793,7 @@ function renderLegend(elId, data){
 
 // キリのいい数値を計算（部門別売買動向用、千円単位）
 // 折れ線最大値 < 縦軸最大値 を保証
+// 25兆円以上の値にも対応
 function calcNiceTicks(minV, maxV, targetCount = 5){
   const range = maxV - minV;
   if(range === 0) return [minV, minV];
@@ -801,7 +802,8 @@ function calcNiceTicks(minV, maxV, targetCount = 5){
   const rangeOku = range / 1e5;
 
   // キリのいい間隔を計算（億円単位）
-  const niceIntervals = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000];
+  // 50000億=5兆、100000億=10兆、200000億=20兆、500000億=50兆
+  const niceIntervals = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000];
   const rawInterval = rangeOku / targetCount;
 
   let bestInterval = niceIntervals[0];
@@ -998,33 +1000,35 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, is
     }
   }
 
-  // 日付ラインの表示
-  if(showDateLine){
-    visibleDates.forEach((d,i)=>{
-      if(d && i % Math.ceil(visibleDates.length/6)===0){
-        // 縦線を描画
-        const x = getX(i);
+  // 日付ラインと日付ラベルの表示
+  visibleDates.forEach((d,i)=>{
+    if(d && i % Math.ceil(visibleDates.length/6)===0){
+      const x = getX(i);
+
+      // 縦線を描画（showDateLineがオンの場合のみ）
+      if(showDateLine){
         ctx.strokeStyle='#e5e7eb';
         ctx.lineWidth=1;
         ctx.beginPath();
         ctx.moveTo(x, pad.t);
         ctx.lineTo(x, h-pad.b);
         ctx.stroke();
-        // 日付ラベル（showFullDateがfalseなら月表示のみ）
-        let displayDate = d;
-        if(!showFullDate && d){
-          // YYYY-MM-DD形式からYYYY-MMに変換
-          const parts = d.split('-');
-          if(parts.length >= 2){
-            displayDate = parts[0] + '-' + parts[1];
-          }
-        }
-        ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--axisDark').trim() || '#6b7280';
-        ctx.textAlign='center';
-        ctx.fillText(displayDate, x, h-6);
       }
-    });
-  }
+
+      // 日付ラベルは常に表示（showFullDateがfalseなら月表示のみ）
+      let displayDate = d;
+      if(!showFullDate && d){
+        // YYYY-MM-DD形式からYYYY-MMに変換
+        const parts = d.split('-');
+        if(parts.length >= 2){
+          displayDate = parts[0] + '-' + parts[1];
+        }
+      }
+      ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--axisDark').trim() || '#6b7280';
+      ctx.textAlign='center';
+      ctx.fillText(displayDate, x, h-6);
+    }
+  });
 
   // ツールチップ用にオフセット情報も保存
   canvas.pointPositions = visibleDates.map((d,i)=>({
