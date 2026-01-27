@@ -41,7 +41,7 @@
       flex-wrap:wrap;
       justify-content:flex-end;
     }
-    .rows{ margin-top:8px; display:flex; flex-direction:column; gap:8px; }
+    .rows{ margin-top:10px; display:flex; flex-direction:column; gap:10px; }
 
     .controls{
       display:flex; align-items:center; gap:12px; flex-wrap:wrap;
@@ -71,61 +71,44 @@
     }
     .chip .muted{ color:var(--muted); }
 
-    .grid2{ display:grid; grid-template-columns: 1fr; gap:12px; margin-top:8px; }
+    .grid2{ display:grid; grid-template-columns: 1fr; gap:12px; margin-top:12px; }
     .chartCard{ border:1px solid var(--line); border-radius:12px; background:#fff; overflow:hidden; }
     .chartHead{
-+      display:flex;
-+      align-items:center;
-+      gap:10px;
-+      padding:8px 12px;              /* ←詰める */
-+      background:#fafafa;
-+      border-bottom:1px solid var(--line);
-+      flex-wrap:nowrap;               /* ←ボタンを押し出させない */
-+    }
-+    .chartHeadLeft{
-+      display:flex;
-+      align-items:center;
-+      gap:12px;
-+      min-width:0;
-+      flex:1 1 auto;
-+    }
-+    .chartTitle{
-+      font-weight:700;
-+      font-size:13px;
-+      color:#111827;
-+      white-space:nowrap;
-+      flex:0 0 auto;
-+      margin-right:0;                 /* ←autoをやめる */
-+    }
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+      background:#fafafa;
+      border-bottom:1px solid var(--line);
+      flex-wrap:wrap;
+    }
+    .chartTitle{ font-weight:700; font-size:13px; color:#111827; margin-right:auto; }
 
-    .legend{ display:flex; gap:14px; flex-wrap:wrap; align-items:center; min-width:0; }
+    .legend{ display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
     .legend-item{ display:flex; align-items:center; gap:6px; font-size:12px; color:#374151; }
     .swatch{ width:12px; height:12px; border-radius:3px; border:1px solid rgba(0,0,0,0.15); }
 
     .selRow{
-+      display:flex;
-+      gap:8px;
-+      align-items:center;
-+      width:100%;
-+      padding:4px 12px;              /* ←詰める（チャートとの無駄を削る） */
-+    }
+      display:flex;
+      gap:8px;
+      align-items:flex-start;
+      width:100%;
+      padding:8px 0;
+    }
     #tseSelContainer, #idxSelContainer{
       display:flex;
       gap:8px;
       flex-wrap:wrap;
       align-items:center;
     }
-    /* プルダウン非表示時は「行ごと消して隙間ゼロ」 */
-    #tseSelRow.hidden, #idxSelRow.hidden{
-      display:none !important;
+    #tseSelContainer.hidden, #idxSelContainer.hidden{
+      display:none;
     }
-    /* 旧：selRow内にボタンを置いていた名残。今回ヘッダに移すので不要 */
-    /* ヘッダ右端のトグル（はみ出し防止） */
-    .chartHead .toggle-btn{
-+      margin-left:10px;
-+      flex:0 0 auto;
-+    }
-    
+    .selRow .toggle-btn{
+      margin-left:8px;
+      margin-right:4px;
+      flex-shrink:0;
+    }
     .sel{
       display:flex;
       align-items:center;
@@ -313,38 +296,33 @@
 
         <div class="grid2">
           <!-- 株価指数チャート（プルダウン1つ） -->
-+          <div class="chartCard">
-+            <div class="chartHead">
-+              <div class="chartHeadLeft">
-+                <div class="chartTitle">株価指数</div>
-+                <div class="legend" id="idxLegend"></div>
-+              </div>
-+              <button class="toggle-btn" id="idxToggleBtn" title="プルダウンの表示/非表示">－</button>
-+            </div>
-+            <div class="selRow" id="idxSelRow">
-+              <div id="idxSelContainer">
-+                <div class="sel">
-+                  <div class="slot">銘柄</div>
-+                  <select id="idxSel1"></select>
-+                </div>
-+              </div>
-+            </div>
-+            <div class="canvasBox">
-+              <canvas id="idxChart"></canvas>
-+            </div>
-+          </div>
+          <div class="chartCard">
+            <div class="chartHead">
+              <div class="chartTitle">株価指数</div>
+              <div class="legend" id="idxLegend"></div>
+            </div>
+            <div class="selRow" id="idxSelRow" style="padding:8px 12px;">
+              <div id="idxSelContainer">
+                <div class="sel">
+                  <div class="slot">銘柄</div>
+                  <select id="idxSel1"></select>
+                </div>
+              </div>
+              <button class="toggle-btn" id="idxToggleBtn" title="プルダウンの表示/非表示">－</button>
+            </div>
+            <div class="canvasBox">
+              <canvas id="idxChart"></canvas>
+            </div>
+          </div>
 
           <!-- 部門別売買動向チャート（プルダウン8個、色選択付き） -->
-+          <div class="chartCard">
-+            <div class="chartHead">
-+              <div class="chartHeadLeft">
-+                <div class="chartTitle">部門別売買動向</div>
-+                <div class="legend" id="tseLegend"></div>
-+              </div>
-+              <button class="toggle-btn" id="tseToggleBtn" title="プルダウンの表示/非表示">－</button>
-+            </div>
-+            <div class="selRow" id="tseSelRow">
-+              <div id="tseSelContainer">
+          <div class="chartCard">
+            <div class="chartHead">
+              <div class="chartTitle">部門別売買動向</div>
+              <div class="legend" id="tseLegend"></div>
+            </div>
+            <div class="selRow" id="tseSelRow" style="padding:8px 12px;">
+              <div id="tseSelContainer">
                 <div class="sel"><div class="slot">1</div><select id="tseSel1"></select><input type="color" class="color-picker" id="tseColor1" value="#FF4B00"><input type="checkbox" class="show-check" id="tseCheck1" checked title="表示/非表示"></div>
                 <div class="sel"><div class="slot">2</div><select id="tseSel2"></select><input type="color" class="color-picker" id="tseColor2" value="#005AFF"><input type="checkbox" class="show-check" id="tseCheck2" checked title="表示/非表示"></div>
                 <div class="sel"><div class="slot">3</div><select id="tseSel3"></select><input type="color" class="color-picker" id="tseColor3" value="#03AF7A"><input type="checkbox" class="show-check" id="tseCheck3" checked title="表示/非表示"></div>
@@ -354,6 +332,7 @@
                 <div class="sel"><div class="slot">7</div><select id="tseSel7"></select><input type="color" class="color-picker" id="tseColor7" value="#84919E"><input type="checkbox" class="show-check" id="tseCheck7" checked title="表示/非表示"></div>
                 <div class="sel"><div class="slot">8</div><select id="tseSel8"></select><input type="color" class="color-picker" id="tseColor8" value="#000000"><input type="checkbox" class="show-check" id="tseCheck8" checked title="表示/非表示"></div>
               </div>
+              <button class="toggle-btn" id="tseToggleBtn" title="プルダウンの表示/非表示">－</button>
             </div>
             <div class="canvasBox">
               <canvas id="tseChart"></canvas>
@@ -1715,21 +1694,21 @@ function init(){
   }
   window.addEventListener("mouseup", onMouseUp);
 
-  // 株価指数プルダウンの表示/非表示トグル（行ごと消して隙間ゼロ）
-+  const idxToggleBtn = document.getElementById("idxToggleBtn");
-+  const idxSelRow = document.getElementById("idxSelRow");
-+  idxToggleBtn.addEventListener("click", ()=>{
-+    const isHidden = idxSelRow.classList.toggle("hidden");
-+    idxToggleBtn.textContent = isHidden ? "＋" : "－";
-+  });
+  // 株価指数プルダウンの表示/非表示トグル
+  const idxToggleBtn = document.getElementById("idxToggleBtn");
+  const idxSelContainer = document.getElementById("idxSelContainer");
+  idxToggleBtn.addEventListener("click", ()=>{
+    const isHidden = idxSelContainer.classList.toggle("hidden");
+    idxToggleBtn.textContent = isHidden ? "＋" : "－";
+  });
 
-  // 部門別プルダウンの表示/非表示トグル（行ごと消して隙間ゼロ）
-+  const tseToggleBtn = document.getElementById("tseToggleBtn");
-+  const tseSelRow = document.getElementById("tseSelRow");
-+  tseToggleBtn.addEventListener("click", ()=>{
-+    const isHidden = tseSelRow.classList.toggle("hidden");
-+    tseToggleBtn.textContent = isHidden ? "＋" : "－";
-+  });
+  // 部門別プルダウンの表示/非表示トグル
+  const tseToggleBtn = document.getElementById("tseToggleBtn");
+  const tseSelContainer = document.getElementById("tseSelContainer");
+  tseToggleBtn.addEventListener("click", ()=>{
+    const isHidden = tseSelContainer.classList.toggle("hidden");
+    tseToggleBtn.textContent = isHidden ? "＋" : "－";
+  });
 
   // 説明モーダル
   const helpBtn = document.getElementById("helpBtn");
