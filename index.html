@@ -96,6 +96,16 @@
       width:100%;
       padding:8px 0;
     }
+    #tseSelContainer{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+      flex:1;
+    }
+    #tseSelContainer.hidden{
+      display:none;
+    }
     .sel{
       display:flex;
       align-items:center;
@@ -145,6 +155,24 @@
 
     .canvasBox{ position:relative; background:#fff; }
     canvas{ display:block; width:100%; cursor:crosshair; }
+
+    .toggle-btn{
+      width:28px; height:28px;
+      border:1px solid #cfd4dc;
+      border-radius:6px;
+      background:#fff;
+      font-size:18px;
+      font-weight:bold;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#374151;
+      flex-shrink:0;
+    }
+    .toggle-btn:hover{
+      background:#f3f4f6;
+    }
     #idxChart{ height:240px; }
     #tseChart{ height:480px; }
 
@@ -176,11 +204,10 @@
             <div class="label">表示本数</div>
             <input id="countRange" type="range" min="10" max="700" step="1" value="200">
             <input id="countNum" type="number" min="10" max="700" step="1" value="200">
-          </div>
-          <div class="group">
-            <div class="label">操作</div>
-            <span class="chip"><span class="muted">ホイール</span> 拡大/縮小</span>
-            <span class="chip"><span class="muted">ドラッグ</span> 横スクロール</span>
+            <label style="display:flex; align-items:center; gap:4px; margin-left:12px; font-size:12px; cursor:pointer;">
+              <input type="checkbox" id="showDateLine" checked style="width:16px; height:16px; accent-color:#2563eb;">
+              日付ライン
+            </label>
           </div>
         </div>
 
@@ -188,7 +215,7 @@
           <!-- 株価指数チャート（プルダウン1つ） -->
           <div class="chartCard">
             <div class="chartHead">
-              <div class="chartTitle">株価指数（PtoCSV_long.csv / list.csv）</div>
+              <div class="chartTitle">株価指数</div>
               <div class="legend" id="idxLegend"></div>
             </div>
             <div class="selRow" id="idxSelRow" style="padding:8px 12px;">
@@ -205,18 +232,21 @@
           <!-- 部門別売買動向チャート（プルダウン8個、色選択付き） -->
           <div class="chartCard">
             <div class="chartHead">
-              <div class="chartTitle">部門別売買動向（TSEPrime.csv）</div>
+              <div class="chartTitle">部門別売買動向</div>
               <div class="legend" id="tseLegend"></div>
             </div>
             <div class="selRow" id="tseSelRow" style="padding:8px 12px;">
-              <div class="sel"><div class="slot">1</div><select id="tseSel1"></select><input type="color" class="color-picker" id="tseColor1" value="#FF4B00"><input type="checkbox" class="show-check" id="tseCheck1" checked title="表示/非表示"></div>
-              <div class="sel"><div class="slot">2</div><select id="tseSel2"></select><input type="color" class="color-picker" id="tseColor2" value="#005AFF"><input type="checkbox" class="show-check" id="tseCheck2" checked title="表示/非表示"></div>
-              <div class="sel"><div class="slot">3</div><select id="tseSel3"></select><input type="color" class="color-picker" id="tseColor3" value="#03AF7A"><input type="checkbox" class="show-check" id="tseCheck3" checked title="表示/非表示"></div>
-              <div class="sel"><div class="slot">4</div><select id="tseSel4"></select><input type="color" class="color-picker" id="tseColor4" value="#4DC4FF"><input type="checkbox" class="show-check" id="tseCheck4" checked title="表示/非表示"></div>
-              <div class="sel"><div class="slot">5</div><select id="tseSel5"></select><input type="color" class="color-picker" id="tseColor5" value="#F6AA00"><input type="checkbox" class="show-check" id="tseCheck5" checked title="表示/非表示"></div>
-              <div class="sel"><div class="slot">6</div><select id="tseSel6"></select><input type="color" class="color-picker" id="tseColor6" value="#990099"><input type="checkbox" class="show-check" id="tseCheck6" checked title="表示/非表示"></div>
-              <div class="sel"><div class="slot">7</div><select id="tseSel7"></select><input type="color" class="color-picker" id="tseColor7" value="#84919E"><input type="checkbox" class="show-check" id="tseCheck7" checked title="表示/非表示"></div>
-              <div class="sel"><div class="slot">8</div><select id="tseSel8"></select><input type="color" class="color-picker" id="tseColor8" value="#000000"><input type="checkbox" class="show-check" id="tseCheck8" checked title="表示/非表示"></div>
+              <div id="tseSelContainer">
+                <div class="sel"><div class="slot">1</div><select id="tseSel1"></select><input type="color" class="color-picker" id="tseColor1" value="#FF4B00"><input type="checkbox" class="show-check" id="tseCheck1" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">2</div><select id="tseSel2"></select><input type="color" class="color-picker" id="tseColor2" value="#005AFF"><input type="checkbox" class="show-check" id="tseCheck2" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">3</div><select id="tseSel3"></select><input type="color" class="color-picker" id="tseColor3" value="#03AF7A"><input type="checkbox" class="show-check" id="tseCheck3" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">4</div><select id="tseSel4"></select><input type="color" class="color-picker" id="tseColor4" value="#4DC4FF"><input type="checkbox" class="show-check" id="tseCheck4" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">5</div><select id="tseSel5"></select><input type="color" class="color-picker" id="tseColor5" value="#F6AA00"><input type="checkbox" class="show-check" id="tseCheck5" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">6</div><select id="tseSel6"></select><input type="color" class="color-picker" id="tseColor6" value="#990099"><input type="checkbox" class="show-check" id="tseCheck6" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">7</div><select id="tseSel7"></select><input type="color" class="color-picker" id="tseColor7" value="#84919E"><input type="checkbox" class="show-check" id="tseCheck7" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">8</div><select id="tseSel8"></select><input type="color" class="color-picker" id="tseColor8" value="#000000"><input type="checkbox" class="show-check" id="tseCheck8" checked title="表示/非表示"></div>
+              </div>
+              <button class="toggle-btn" id="tseToggleBtn" title="プルダウンの表示/非表示">－</button>
             </div>
             <div class="canvasBox">
               <canvas id="tseChart"></canvas>
@@ -268,6 +298,7 @@ let globalDates = [];
 
 let displayCount = 200;
 let offsetX = 0;
+let showDateLine = true;
 
 let isDragging = false;
 let dragStartX = 0;
@@ -416,6 +447,14 @@ function bindControls(){
 
   countRange.addEventListener('input', ()=>setCount(countRange.value));
   countNum.addEventListener('change', ()=>setCount(countNum.value));
+
+  // 日付ラインチェックボックス
+  const dateLineCheck = document.getElementById('showDateLine');
+  dateLineCheck.checked = showDateLine;
+  dateLineCheck.addEventListener('change', ()=>{
+    showDateLine = dateLineCheck.checked;
+    redrawAll();
+  });
 }
 
 /* ========= encoding-safe fetch ========= */
@@ -673,7 +712,45 @@ function renderLegend(elId, data){
   }
 }
 
-function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices){
+// キリのいい数値を計算（部門別売買動向用、千円単位）
+function calcNiceTicks(minV, maxV, targetCount = 5){
+  const range = maxV - minV;
+  if(range === 0) return [minV];
+
+  // 億円単位での範囲
+  const rangeOku = range / 1e5;
+
+  // キリのいい間隔を計算（億円単位）
+  const niceIntervals = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000];
+  const rawInterval = rangeOku / targetCount;
+
+  let bestInterval = niceIntervals[0];
+  for(const ni of niceIntervals){
+    if(ni >= rawInterval){
+      bestInterval = ni;
+      break;
+    }
+    bestInterval = ni;
+  }
+
+  // 千円単位に戻す
+  const interval = bestInterval * 1e5;
+
+  // 開始値をキリのいい数値に
+  const startTick = Math.floor(minV / interval) * interval;
+
+  const ticks = [];
+  for(let t = startTick; t <= maxV + interval * 0.5; t += interval){
+    if(t >= minV - interval * 0.5){
+      ticks.push(t);
+    }
+    if(ticks.length > 10) break;
+  }
+
+  return ticks;
+}
+
+function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, isTseChart = false){
   const w=canvas.width, h=canvas.height;
   const pad={t:14,b:28,l:12,r:90};
   const chartW=w-pad.l-pad.r;
@@ -729,32 +806,70 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices){
   }
 
   const range=(maxV-minV)||1;
-  minV -= range*0.06;
-  maxV += range*0.06;
 
-  const scaleY=chartH/(maxV-minV);
-  const getX=(i)=>pad.l+(i+0.5)*(chartW/visibleDates.length);
-  const getY=(val)=>pad.t+chartH-(val-minV)*scaleY;
-
-  ctx.strokeStyle='#eef0f3'; ctx.lineWidth=1;
-  const gridSteps=5;
-  for(let i=0;i<=gridSteps;i++){
-    const y=pad.t+(chartH*i/gridSteps);
-    const v=maxV-(maxV-minV)*(i/gridSteps);
-    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
-    ctx.fillStyle='#9aa1ab'; ctx.textAlign='left';
-    // 数値を見やすい形式で表示（大きい数値は億単位など）
-    const formattedVal = formatAxisValue(v);
-    ctx.fillText(formattedVal, w-pad.r+6, y+4);
+  // 部門別チャートの場合はキリのいい数値で範囲を設定
+  let plotMinV, plotMaxV;
+  let ticks = [];
+  if(isTseChart){
+    ticks = calcNiceTicks(minV, maxV, 5);
+    plotMinV = ticks[0];
+    plotMaxV = ticks[ticks.length - 1];
+    // 範囲を少し広げる
+    const tickRange = plotMaxV - plotMinV;
+    plotMinV -= tickRange * 0.02;
+    plotMaxV += tickRange * 0.02;
+  } else {
+    plotMinV = minV - range*0.06;
+    plotMaxV = maxV + range*0.06;
   }
 
-  visibleDates.forEach((d,i)=>{
-    if(d && i % Math.ceil(visibleDates.length/6)===0){
-      ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--axisDark').trim() || '#6b7280';
-      ctx.textAlign='center';
-      ctx.fillText(d, getX(i), h-6);
+  const scaleY=chartH/(plotMaxV-plotMinV);
+  const getX=(i)=>pad.l+(i+0.5)*(chartW/visibleDates.length);
+  const getY=(val)=>pad.t+chartH-(val-plotMinV)*scaleY;
+
+  ctx.strokeStyle='#eef0f3'; ctx.lineWidth=1;
+
+  if(isTseChart && ticks.length > 0){
+    // 部門別チャート：キリのいい数値でグリッド線
+    for(const t of ticks){
+      const y = getY(t);
+      ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
+      ctx.fillStyle='#9aa1ab'; ctx.textAlign='left';
+      const formattedVal = formatTseAxisValue(t);
+      ctx.fillText(formattedVal, w-pad.r+6, y+4);
     }
-  });
+  } else {
+    // 株価指数チャート：従来通り
+    const gridSteps=5;
+    for(let i=0;i<=gridSteps;i++){
+      const y=pad.t+(chartH*i/gridSteps);
+      const v=plotMaxV-(plotMaxV-plotMinV)*(i/gridSteps);
+      ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
+      ctx.fillStyle='#9aa1ab'; ctx.textAlign='left';
+      const formattedVal = formatAxisValue(v);
+      ctx.fillText(formattedVal, w-pad.r+6, y+4);
+    }
+  }
+
+  // 日付ラインの表示
+  if(showDateLine){
+    visibleDates.forEach((d,i)=>{
+      if(d && i % Math.ceil(visibleDates.length/6)===0){
+        // 縦線を描画
+        const x = getX(i);
+        ctx.strokeStyle='#e5e7eb';
+        ctx.lineWidth=1;
+        ctx.beginPath();
+        ctx.moveTo(x, pad.t);
+        ctx.lineTo(x, h-pad.b);
+        ctx.stroke();
+        // 日付ラベル
+        ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--axisDark').trim() || '#6b7280';
+        ctx.textAlign='center';
+        ctx.fillText(d, x, h-6);
+      }
+    });
+  }
 
   // ツールチップ用にオフセット情報も保存
   canvas.pointPositions = visibleDates.map((d,i)=>({
@@ -820,6 +935,28 @@ function formatAxisValue(v){
     return (v / 1e4).toFixed(0) + "万";
   } else {
     return v.toFixed(0);
+  }
+}
+
+// 部門別売買動向用：千円単位→億円単位で表示
+// 1億円 = 100,000千円（1e5）
+// 1兆円 = 100,000,000千円（1e8）
+function formatTseAxisValue(v){
+  // vは千円単位
+  const okuVal = v / 1e5; // 億円に変換
+  const absOku = Math.abs(okuVal);
+
+  if(absOku >= 10000){
+    // 1兆以上：○兆○○○○億円
+    const cho = Math.floor(okuVal / 10000);
+    const oku = Math.abs(Math.round(okuVal % 10000));
+    if(oku === 0){
+      return cho + "兆円";
+    }
+    return cho + "兆" + oku + "億円";
+  } else {
+    // 1兆未満：○○億円
+    return Math.round(okuVal) + "億円";
   }
 }
 
@@ -995,8 +1132,8 @@ function redrawAll(){
   // 指数チャート: 同じ期間だがidxDatesで
   const idxWindow = getChartWindow(idxDates, baseDates);
 
-  drawChartGeneric(idxCtx, idxCanvas, idxData, idxWindow.visibleDates, idxWindow.visibleAbsIndices);
-  drawChartGeneric(tseCtx, tseCanvas, tseData, tseWindow.visibleDates, tseWindow.visibleAbsIndices);
+  drawChartGeneric(idxCtx, idxCanvas, idxData, idxWindow.visibleDates, idxWindow.visibleAbsIndices, false);
+  drawChartGeneric(tseCtx, tseCanvas, tseData, tseWindow.visibleDates, tseWindow.visibleAbsIndices, true);
 }
 
 /* ========= select UI ========= */
@@ -1345,6 +1482,14 @@ function init(){
     c.addEventListener("mouseleave", onMouseLeave);
   }
   window.addEventListener("mouseup", onMouseUp);
+
+  // 部門別プルダウンの表示/非表示トグル
+  const tseToggleBtn = document.getElementById("tseToggleBtn");
+  const tseSelContainer = document.getElementById("tseSelContainer");
+  tseToggleBtn.addEventListener("click", ()=>{
+    const isHidden = tseSelContainer.classList.toggle("hidden");
+    tseToggleBtn.textContent = isHidden ? "＋" : "－";
+  });
 
   autoLoad().catch(err=>{
     console.error(err);
