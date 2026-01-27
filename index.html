@@ -339,14 +339,27 @@
           <button class="modal-close" id="modalClose">&times;</button>
         </div>
         <div class="modal-body">
-          <p>JPXが発表する投資部門別売買動向をAPIで取得しています。</p>
+          <p>投資部門別売買動向をJPX・APIで取得。</p>
           <p><strong>更新タイミング</strong><br>
           投資部門別情報・週次の第4営業日＝木曜日の18:00頃<br>
           通常は木曜日、祝日等非営業日がある場合はその分後ろ倒し。</p>
-          <p>連休等により通常と異なる公表スケジュールとなる場合は<a href="https://www.jpx.co.jp/markets/statistics-equities/investor-type/index.html" target="_blank">こちら</a>をご確認ください。</p>
           <div class="section-title">各項目定義</div>
-          <p>総計＝自己＋委託<br>
-          委託＝自己以外の全て</p>
+          <p><br>
+          総計<br>
+            ├─自己計<br>
+            └─委託計<br>
+　　          ├─個人<br>
+　　　　 　　　├─海外投資家<br>
+　　　　 　　　├─証券会社<br>
+　　　　 　　　├─投資信託<br>
+　　　　　 　　├─金融<br>
+　　　　　　 　　 ├─生保・損保<br>
+ 　  　　　　 　　├─都銀・地銀等<br>
+ 　  　　　　　 　├─信託銀行<br>
+ 　  　　　　　　 └─その他金融機関<br>
+　　　　　　　 ├─法人_差引累計<br>
+ 　  　　　　　 　├─事業法人<br>
+ 　  　　　　　　 └─その他法人</p>
         </div>
       </div>
     </div>
