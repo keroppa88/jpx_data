@@ -514,17 +514,30 @@ async function loadNameList(filename){
     const dec = new TextDecoder(decoderName, {fatal:false});
     return dec.decode(buf);
   }
-  function parseToNames(text){
+  function parseToNames(text, forBumonList = false){
     if(!text) return null;
     const lines = text.split(/\r?\n/);
     const out = [];
+    let afterDisplayOrder = false;
+
     for(const raw of lines){
       let line = String(raw||"");
-      line = line.replace(/^\uFEFF/, "").trim();
-      if(!line || line.startsWith('#')) continue;
-      const first = line.split(/\t|,/)[0].replace(/^"+|"+$/g,'').trim();
-      if(first) out.push(first);
+      line = line.replace(/^\uFEFF/, "");
+      if(!line.trim() || line.trim().startsWith('#')) continue;
+
+      // bumonlist.csvの場合、●表示順●以降のみを取得
+      if(forBumonList){
+        if(line.includes("●表示順●")){
+          afterDisplayOrder = true;
+          continue;
+        }
+        if(!afterDisplayOrder) continue;
+      }
+
+      const first = line.split(/\t|,/)[0].replace(/^"+|"+$/g,'');
+      if(first.trim()) out.push(first); // トリムしないで保持（├─などのプレフィックス保持）
     }
+
     const seen = new Set();
     const uniq = [];
     for(const n of out){
@@ -535,11 +548,13 @@ async function loadNameList(filename){
     return uniq.length ? uniq : null;
   }
 
+  const isBumonList = filename.includes('bumonlist');
+
   const tUtf8 = await fetchText('utf-8');
-  const nUtf8 = parseToNames(tUtf8);
+  const nUtf8 = parseToNames(tUtf8, isBumonList);
 
   const tSjis = await fetchText('shift-jis');
-  const nSjis = parseToNames(tSjis);
+  const nSjis = parseToNames(tSjis, isBumonList);
 
   if(!nUtf8 && !nSjis) return null;
   if(nUtf8 && !nSjis) return nUtf8;
@@ -555,6 +570,12 @@ function buildIdxSeries(rows, key, dates){
   const values = dates.map(d => (map.has(d) ? map.get(d) : null));
   return { dates, series: [{ label: key, color: "#2563eb", width: 2, values }] };
 }
+
+// 合成項目の定義（複数の差引を合計して計算）
+const COMPOSITE_FIELDS = {
+  "金融_差引累計": ["生保・損保_差引", "都銀・地銀等_差引", "信託銀行_差引", "その他金融機関_差引"],
+  "法人_差引累計": ["事業法人_差引", "その他法人_差引"]
+};
 
 function buildTseSeries(rows, keys, colors, dates, visible){
   const series = [];
@@ -573,14 +594,43 @@ function buildTseSeries(rows, keys, colors, dates, visible){
     // 差引累計がある場合、差引累計以外はスキップ
     if(hasCumulative && !isCumulative) continue;
 
-    const baseKey = isCumulative ? k.replace("_差引累計", "_差引") : k;
-
-    const map = new Map();
-    for(const r of rows){ if(r.name===baseKey) map.set(r.date, r.value); }
+    // 合成項目（金融_差引累計、法人_差引累計）かどうかをチェック
+    const isComposite = COMPOSITE_FIELDS.hasOwnProperty(k);
 
     let values;
-    if(isCumulative){
-      // 全範囲で累積計算（描画時に表示範囲でオフセット調整）
+    if(isComposite){
+      // 合成項目の場合、複数の差引を合計して累積計算
+      const baseKeys = COMPOSITE_FIELDS[k];
+      const maps = baseKeys.map(baseKey => {
+        const m = new Map();
+        for(const r of rows){ if(r.name === baseKey) m.set(r.date, r.value); }
+        return m;
+      });
+
+      values = [];
+      let cumulative = 0;
+      for(let j=0; j<dates.length; j++){
+        const d = dates[j];
+        let sum = 0;
+        let hasValue = false;
+        for(const m of maps){
+          const v = m.has(d) ? m.get(d) : null;
+          if(v !== null){
+            sum += v;
+            hasValue = true;
+          }
+        }
+        if(hasValue){
+          cumulative += sum;
+        }
+        values.push(cumulative);
+      }
+    } else if(isCumulative){
+      // 通常の累積計算
+      const baseKey = k.replace("_差引累計", "_差引");
+      const map = new Map();
+      for(const r of rows){ if(r.name===baseKey) map.set(r.date, r.value); }
+
       values = [];
       let cumulative = 0;
       for(let j=0; j<dates.length; j++){
@@ -592,10 +642,13 @@ function buildTseSeries(rows, keys, colors, dates, visible){
         values.push(cumulative);
       }
     } else {
+      // 通常の値
+      const map = new Map();
+      for(const r of rows){ if(r.name===k) map.set(r.date, r.value); }
       values = dates.map(d => (map.has(d) ? map.get(d) : null));
     }
 
-    series.push({ label: k, color: colors[i] || DEFAULT_COLORS[i % DEFAULT_COLORS.length], width: 2, values, isCumulative, slotIndex: i });
+    series.push({ label: k, color: colors[i] || DEFAULT_COLORS[i % DEFAULT_COLORS.length], width: 2, values, isCumulative: isCumulative || isComposite, slotIndex: i });
   }
   return { dates, series };
 }
@@ -989,6 +1042,12 @@ function fillIdxSelect(selectEl, names, current){
   selectEl.value = current || "";
 }
 
+// 表示名からvalue（キー名）を抽出する関数
+function extractKeyFromDisplayName(displayName){
+  // ├─、└─、　├─、　└─などのプレフィックスを除去
+  return displayName.replace(/^[├└　 ─]+/, '').trim();
+}
+
 function fillTseSelect(selectEl, names, current){
   selectEl.innerHTML = "";
   const optEmpty = document.createElement("option");
@@ -996,26 +1055,29 @@ function fillTseSelect(selectEl, names, current){
   optEmpty.textContent = "— 選択 —";
   selectEl.appendChild(optEmpty);
 
-  // 通常の項目を追加
-  for(const n of names){
-    const opt = document.createElement("option");
-    opt.value = n;
-    opt.textContent = n;
-    selectEl.appendChild(opt);
-  }
+  let currentOptGroup = null;
 
-  // 差引累計のオプションを追加（差引項目のみ）
-  const balItems = names.filter(n => n.endsWith("_差引"));
-  if(balItems.length > 0){
-    const optGroup = document.createElement("optgroup");
-    optGroup.label = "━━ 差引累計 ━━";
-    for(const n of balItems){
-      const opt = document.createElement("option");
-      opt.value = n.replace("_差引", "_差引累計");
-      opt.textContent = n.replace("_差引", "_差引累計");
-      optGroup.appendChild(opt);
+  for(const n of names){
+    const trimmed = n.trim();
+
+    // セパレータ行（ー差引累計ー、ー個別項目ー）はoptgroupとして扱う
+    if(trimmed.startsWith("ー") && trimmed.endsWith("ー")){
+      currentOptGroup = document.createElement("optgroup");
+      currentOptGroup.label = trimmed;
+      selectEl.appendChild(currentOptGroup);
+      continue;
     }
-    selectEl.appendChild(optGroup);
+
+    const opt = document.createElement("option");
+    const keyName = extractKeyFromDisplayName(n);
+    opt.value = keyName;
+    opt.textContent = n; // プレフィックス付きの表示名
+
+    if(currentOptGroup){
+      currentOptGroup.appendChild(opt);
+    } else {
+      selectEl.appendChild(opt);
+    }
   }
 
   selectEl.value = current || "";
@@ -1102,7 +1164,27 @@ async function autoLoad(){
   idxAvail = (idxList ? idxList.filter(n => idxNamesFromData.includes(n)) : idxNamesFromData);
   if(idxAvail.length === 0) idxAvail = idxNamesFromData;
 
-  tseAvail = (tseList ? tseList.filter(n => tseNamesFromData.includes(n)) : tseNamesFromData);
+  // 部門別リストのフィルタリング（表示順リストを尊重）
+  if(tseList){
+    tseAvail = tseList.filter(n => {
+      const trimmed = n.trim();
+      // セパレータ行は常に含める
+      if(trimmed.startsWith("ー") && trimmed.endsWith("ー")) return true;
+      // キー名を抽出
+      const keyName = extractKeyFromDisplayName(n);
+      // 合成項目（金融_差引累計、法人_差引累計）は常に含める
+      if(COMPOSITE_FIELDS.hasOwnProperty(keyName)) return true;
+      // 差引累計項目の場合、ベースとなる差引がデータに存在するか確認
+      if(keyName.endsWith("_差引累計")){
+        const baseKey = keyName.replace("_差引累計", "_差引");
+        return tseNamesFromData.includes(baseKey);
+      }
+      // 通常の項目はデータに存在するか確認
+      return tseNamesFromData.includes(keyName);
+    });
+  } else {
+    tseAvail = tseNamesFromData;
+  }
   if(tseAvail.length === 0) tseAvail = tseNamesFromData;
 
   // 日付軸
