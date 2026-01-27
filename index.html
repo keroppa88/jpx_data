@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Index + TSEPrime (2 charts)</title>
+  <title>株価指数・部門別売買動向チャート</title>
   <style>
     :root{
       --bg:#f5f5f7;
@@ -139,7 +139,7 @@
   <div class="wrap">
     <div class="card">
       <div class="header">
-        <h1>Charts: Index (PtoCSV) + 部門別売買動向 (TSEPrime)</h1>
+        <h1>株価指数・部門別売買動向チャート</h1>
         <span class="sub" id="status">読込中…</span>
         <div class="headerRight">
           <span class="chip" id="latestChip"><span class="muted">最新</span> -</span>
@@ -164,14 +164,12 @@
         <div class="grid2">
           <div class="chartCard">
             <div class="chartHead">
-              <div class="chartTitle">株価指数（PtoCSV.csv / list.csv）</div>
+              <div class="chartTitle">株価指数</div>
               <div class="legend" id="idxLegend"></div>
               <div class="selRow" id="idxSelRow">
-                <div class="sel"><div class="slot">1</div><select id="idxSel1"></select></div>
-                <div class="sel"><div class="slot">2</div><select id="idxSel2"></select></div>
-                <div class="sel"><div class="slot">3</div><select id="idxSel3"></select></div>
-                </div>
+                <div class="sel"><select id="idxSel1"></select></div>
               </div>
+            </div>
             </div>
             <div class="canvasBox">
               <canvas id="idxChart"></canvas>
@@ -180,7 +178,7 @@
 
           <div class="chartCard">
             <div class="chartHead">
-              <div class="chartTitle">部門別売買動向（TSEPrime.csv / bumonlist.csv）</div>
+              <div class="chartTitle">部門別売買動向（差引項目は起点から累積）</div>
               <div class="legend" id="tseLegend"></div>
               <div class="selRow" id="tseSelRow">
                 <div class="sel"><div class="slot">1</div><select id="tseSel1"></select></div>
@@ -248,9 +246,8 @@ let idxCanvas, idxCtx, tseCanvas, tseCtx, tooltip;
 let idxAvail = [];
 let tseAvail = [];
 
-const IDX_SELECTION_COUNT = 3;
-const IDX_STORAGE_KEY = "idxKeys_v2";
-const IDX_LEGACY_STORAGE_KEY = "idxKey_v1";
+const IDX_SELECTION_COUNT = 1;
+const IDX_STORAGE_KEY = "idxKey_v3";
 let idxKeys = new Array(IDX_SELECTION_COUNT).fill("");
 let tseKeys = ["","","","",""];
 
@@ -514,12 +511,52 @@ function buildOneSeries(rows, key, color, dates){
   const values = dates.map(d => (map.has(d) ? map.get(d) : null));
   return { label: key, color, width: 2, values };
 }
+
+// 差引項目を累積表示する（起点日を0として累積）
+function buildCumulativeSeries(rows, key, color, dates){
+  const map = new Map();
+  for(const r of rows){ if(r.name===key) map.set(r.date, r.value); }
+
+  // 累積計算
+  const values = [];
+  let cumulative = 0;
+  for(const d of dates){
+    if(map.has(d)){
+      cumulative += map.get(d);
+      values.push(cumulative);
+    } else {
+      values.push(null);
+    }
+  }
+  return { label: key + "（累積）", color, width: 2, values };
+}
+
+// 差引項目かどうか判定
+function isBalanceField(name){
+  return name && name.includes("差引");
+}
+
 function buildMultiSeries(rows, keys, dates){
   const series = [];
   for(let i=0;i<keys.length;i++){
     const k = keys[i];
     if(!k) continue;
     series.push(buildOneSeries(rows, k, INITIAL_COLORS[i] || COLOR_PALETTE[i % COLOR_PALETTE.length].hex, dates));
+  }
+  return { dates, series };
+}
+
+// TSE用：差引項目は累積表示
+function buildTseSeries(rows, keys, dates){
+  const series = [];
+  for(let i=0;i<keys.length;i++){
+    const k = keys[i];
+    if(!k) continue;
+    if(isBalanceField(k)){
+      series.push(buildCumulativeSeries(rows, k, INITIAL_COLORS[i] || COLOR_PALETTE[i % COLOR_PALETTE.length].hex, dates));
+    } else {
+      series.push(buildOneSeries(rows, k, INITIAL_COLORS[i] || COLOR_PALETTE[i % COLOR_PALETTE.length].hex, dates));
+    }
   }
   return { dates, series };
 }
@@ -726,7 +763,8 @@ function rebuildData(){
   idxData = buildMultiSeries(idxRows, idxKeys, idxDates);
   idxData.dateIndex = buildDateIndex(idxDates);
 
-  tseData = buildMultiSeries(tseRows, tseKeys, tseDates);
+  // TSEデータは差引項目を累積表示
+  tseData = buildTseSeries(tseRows, tseKeys, tseDates);
   tseData.dateIndex = buildDateIndex(tseDates);
 
   renderLegend("idxLegend", idxData);
@@ -765,16 +803,16 @@ function fillSelect(selectEl, names, current){
   selectEl.value = current || "";
 }
 function bindSelects(){
-  for(let i=0;i<IDX_SELECTION_COUNT;i++){
-    const el = document.getElementById(`idxSel${i+1}`);
-    fillSelect(el, idxAvail, idxKeys[i]);
-    el.addEventListener("change", ()=>{
-      idxKeys[i] = el.value || "";
-      try{ localStorage.setItem(IDX_STORAGE_KEY, JSON.stringify(idxKeys)); }catch(e){}
-      rebuildData(); redrawAll();
-    });
-  }
+  // 指数選択（1つのみ）
+  const idxEl = document.getElementById("idxSel1");
+  fillSelect(idxEl, idxAvail, idxKeys[0]);
+  idxEl.addEventListener("change", ()=>{
+    idxKeys[0] = idxEl.value || "";
+    try{ localStorage.setItem(IDX_STORAGE_KEY, idxKeys[0]); }catch(e){}
+    rebuildData(); redrawAll();
+  });
 
+  // 部門別選択（5つ）
   for(let i=0;i<5;i++){
     const el = document.getElementById(`tseSel${i+1}`);
     fillSelect(el, tseAvail, tseKeys[i]);
@@ -835,16 +873,8 @@ async function autoLoad(){
   // restore last selections
   try{
     const raw = localStorage.getItem(IDX_STORAGE_KEY);
-    if(raw){
-      const arr = JSON.parse(raw);
-      if(Array.isArray(arr) && arr.length){
-        idxKeys = new Array(IDX_SELECTION_COUNT).fill("").map((_, i)=> arr[i] && idxAvail.includes(arr[i]) ? arr[i] : "");
-      }
-    }else{
-      const legacy = localStorage.getItem(IDX_LEGACY_STORAGE_KEY);
-      if(legacy && idxAvail.includes(legacy)){
-        idxKeys[0] = legacy;
-      }
+    if(raw && idxAvail.includes(raw)){
+      idxKeys[0] = raw;
     }
   }catch(e){}
   try{
@@ -857,10 +887,8 @@ async function autoLoad(){
     }
   }catch(e){}
 
-  if(idxKeys.every(k => !k) && idxAvail[0]) idxKeys[0] = idxAvail[0];
-  for(let i=0;i<IDX_SELECTION_COUNT;i++){
-    if(!idxKeys[i] && idxAvail[i]) idxKeys[i] = idxAvail[i];
-  }
+  // デフォルト値設定
+  if(!idxKeys[0] && idxAvail[0]) idxKeys[0] = idxAvail[0];
   for(let i=0;i<5;i++){
     if(!tseKeys[i] && tseAvail[i]) tseKeys[i] = tseAvail[i];
   }
