@@ -505,8 +505,8 @@ function updateTopChips(){
   const latestEl = document.getElementById("latestChip");
   const viewEl = document.getElementById("viewChip");
 
-  // 部門別データを基準にする（メインデータ）
-  const baseDates = tseDates.length > 0 ? tseDates : globalDates;
+  // 両チャートで統一された時系列を使用
+  const baseDates = getBaseDates();
 
   if(!baseDates || baseDates.length===0){
     latestEl.innerHTML = `<span class="muted">最新</span> -`;
@@ -693,12 +693,45 @@ async function loadNameList(filename){
 }
 
 /* ========= series building ========= */
-function buildIdxSeries(rows, key, dates){
-  if(!key) return { dates, series: [] };
-  const map = new Map();
-  for(const r of rows){ if(r.name===key) map.set(r.date, r.value); }
-  const values = dates.map(d => (map.has(d) ? map.get(d) : null));
-  return { dates, series: [{ label: key, color: "#2563eb", width: 2, values }] };
+// 指数データを週次日付（tseDates）にマッピング
+// 各週次日付に対して、その日付以前で最も近い日次データの値を使用
+function mapIdxToWeeklyDates(rows, key, weeklyDates, dailyDates){
+  if(!key || !weeklyDates || weeklyDates.length === 0) return [];
+
+  // 日次データのmapを作成
+  const dailyMap = new Map();
+  for(const r of rows){ if(r.name === key) dailyMap.set(r.date, r.value); }
+
+  // 各週次日付に対応する値を探す
+  const values = [];
+  for(const wd of weeklyDates){
+    // 完全一致があればそれを使用
+    if(dailyMap.has(wd)){
+      values.push(dailyMap.get(wd));
+    } else {
+      // 週次日付以前で最も近い日次日付を探す
+      let closestValue = null;
+      let closestDate = null;
+      for(const dd of dailyDates){
+        if(dd <= wd){
+          if(!closestDate || dd > closestDate){
+            closestDate = dd;
+            if(dailyMap.has(dd)){
+              closestValue = dailyMap.get(dd);
+            }
+          }
+        }
+      }
+      values.push(closestValue);
+    }
+  }
+  return values;
+}
+
+function buildIdxSeries(rows, key, weeklyDates, dailyDates){
+  if(!key) return { dates: weeklyDates, series: [] };
+  const values = mapIdxToWeeklyDates(rows, key, weeklyDates, dailyDates);
+  return { dates: weeklyDates, series: [{ label: key, color: "#2563eb", width: 2, values }] };
 }
 
 // 合成項目の定義（複数の差引を合計して計算）
@@ -1200,7 +1233,8 @@ function showTooltipForCanvas(e, canvas, data){
 
 /* ========= interactions (shared) ========= */
 function getBaseDates(){
-  return tseDates.length > 0 ? tseDates : globalDates;
+  // 両チャートで統一された時系列を返す（週次データ優先）
+  return tseDates.length > 0 ? tseDates : idxDates;
 }
 
 function onWheelZoom(e){
@@ -1262,13 +1296,17 @@ function onMouseLeave(){
 
 /* ========= redraw ========= */
 function rebuildData(){
-  // 指数データ
-  idxData = buildIdxSeries(idxRows, idxKey, idxDates);
-  idxData.dateIndex = buildDateIndex(idxDates);
+  // 基準となる時系列は週次データ（tseDates）を使用
+  // 両チャートで同じ時系列を使うことで、折れ線グラフの横幅と時系列が完全に一致する
+  const baseDates = tseDates.length > 0 ? tseDates : idxDates;
+
+  // 指数データ: tseDatesにマッピング（日次→週次）
+  idxData = buildIdxSeries(idxRows, idxKey, baseDates, idxDates);
+  idxData.dateIndex = buildDateIndex(baseDates);
 
   // 部門別データ
-  tseData = buildTseSeries(tseRows, tseKeys, tseColors, tseDates, tseVisible);
-  tseData.dateIndex = buildDateIndex(tseDates);
+  tseData = buildTseSeries(tseRows, tseKeys, tseColors, baseDates, tseVisible);
+  tseData.dateIndex = buildDateIndex(baseDates);
 
   renderLegend("idxLegend", idxData);
   renderLegend("tseLegend", tseData);
@@ -1277,55 +1315,19 @@ function rebuildData(){
   updateTseSelectionUI();
 }
 
-// 各チャート用の独立した表示範囲を計算
-function getChartWindow(dates, baseDates){
-  // baseDatesを基準に表示範囲を計算し、datesに適用
-  const n = baseDates.length;
-  const count = Math.max(10, Math.min(displayCount, MAX_DISPLAY, n || 10));
-  const maxOffset = Math.max(0, n - count);
-  const localOffset = Math.max(0, Math.min(Math.round(offsetX), maxOffset));
-  const startRaw = n - count - localOffset;
-  const endRaw = startRaw + count;
-  const start = Math.max(0, startRaw);
-  const end = Math.min(n, endRaw);
-
-  // 基準となる日付範囲を取得
-  const startDate = baseDates[start] || null;
-  const endDate = baseDates[end - 1] || null;
-
-  if(!startDate || !endDate || dates.length === 0){
-    return { visibleDates: [], visibleAbsIndices: [] };
-  }
-
-  // datesから該当範囲の日付を抽出
-  const filteredIndices = [];
-  const filteredDates = [];
-  for(let i = 0; i < dates.length; i++){
-    const d = dates[i];
-    if(d >= startDate && d <= endDate){
-      filteredIndices.push(i);
-      filteredDates.push(d);
-    }
-  }
-
-  return { visibleDates: filteredDates, visibleAbsIndices: filteredIndices };
-}
-
 function redrawAll(){
   rebuildData(); // 累積計算のために毎回再構築
 
-  // 部門別データがメイン: tseDatesを基準にする
-  // 指数データはその範囲に合わせる
-  const baseDates = tseDates.length > 0 ? tseDates : globalDates;
+  // 両チャートで同じ時系列（tseDates）を使用
+  // これにより折れ線グラフの横幅と時系列の線が完全に一致する
+  const baseDates = tseDates.length > 0 ? tseDates : idxDates;
 
-  // 部門別チャート: tseDatesを基準
-  const tseWindow = getChartWindow(tseDates, baseDates);
+  // 共通の表示範囲を計算
+  const commonWindow = getVisibleWindowForDates(baseDates);
 
-  // 指数チャート: 同じ期間だがidxDatesで
-  const idxWindow = getChartWindow(idxDates, baseDates);
-
-  drawChartGeneric(idxCtx, idxCanvas, idxData, idxWindow.visibleDates, idxWindow.visibleAbsIndices, false);
-  drawChartGeneric(tseCtx, tseCanvas, tseData, tseWindow.visibleDates, tseWindow.visibleAbsIndices, true);
+  // 両チャートで同じvisibleDates, visibleAbsIndicesを使用
+  drawChartGeneric(idxCtx, idxCanvas, idxData, commonWindow.visibleDates, commonWindow.visibleAbsIndices, false);
+  drawChartGeneric(tseCtx, tseCanvas, tseData, commonWindow.visibleDates, commonWindow.visibleAbsIndices, true);
 }
 
 /* ========= select UI ========= */
