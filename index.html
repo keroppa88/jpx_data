@@ -95,6 +95,18 @@
       flex-wrap:wrap;
       align-items:center;
     }
+    /* 増減チャートの表示項目は横4×縦2のグリッド */
+    #barSelContainer{
+      display:grid;
+      grid-template-columns:repeat(4, minmax(0, 1fr));
+      gap:8px;
+      width:100%;
+    }
+    #barSelContainer select{
+      min-width:0;
+      flex:1;
+      width:100%;
+    }
     #tseSelContainer.hidden, #idxSelContainer.hidden{
       display:none;
     }
@@ -158,6 +170,11 @@
     canvas{ display:block; width:100%; height:100%; cursor:crosshair; }
     .chartCard.collapsed .selRow,
     .chartCard.collapsed .canvasBox{ display:none; }
+    .selRow.hidden{ display:none; }
+    .sel-toggle-btn{
+      width:24px; height:24px;
+      font-size:14px;
+    }
 
     .toggle-btn{
       width:28px; height:28px;
@@ -314,7 +331,8 @@
             <div class="chartHead">
               <div class="chartTitle">部門別売買動向（累積）</div>
               <div class="legend" id="tseLegend"></div>
-              <button class="toggle-btn" id="tseToggleBtn" title="プルダウンの表示/非表示">－</button>
+              <button class="toggle-btn sel-toggle-btn" id="tseSelToggleBtn" title="表示項目の表示/非表示">－</button>
+              <button class="toggle-btn" id="tseToggleBtn" title="チャートの表示/非表示">－</button>
             </div>
             <div class="selRow" id="tseSelRow" style="padding:8px 12px;">
               <div id="tseSelContainer">
@@ -338,7 +356,11 @@
             <div class="chartHead">
               <div class="chartTitle">部門別売買動向（増減）</div>
               <div class="legend" id="barLegend"></div>
+              <button class="toggle-btn sel-toggle-btn" id="barSelToggleBtn" title="表示項目の表示/非表示">－</button>
               <button class="toggle-btn" id="barToggleBtn" title="チャートの表示/非表示">－</button>
+            </div>
+            <div class="canvasBox" id="barBox">
+              <canvas id="barChart"></canvas>
             </div>
             <div class="selRow" id="barSelRow" style="padding:8px 12px;">
               <div id="barSelContainer">
@@ -351,9 +373,6 @@
                 <div class="sel"><div class="slot">7</div><select id="barSel7"></select><input type="color" class="color-picker" id="barColor7" value="#84919E"><input type="checkbox" class="show-check" id="barCheck7" checked title="表示/非表示"></div>
                 <div class="sel"><div class="slot">8</div><select id="barSel8"></select><input type="color" class="color-picker" id="barColor8" value="#000000"><input type="checkbox" class="show-check" id="barCheck8" checked title="表示/非表示"></div>
               </div>
-            </div>
-            <div class="canvasBox" id="barBox">
-              <canvas id="barChart"></canvas>
             </div>
           </div>
         </div>
@@ -1937,6 +1956,17 @@ function init(){
     c.addEventListener("mouseleave", onMouseLeave);
   }
   window.addEventListener("mouseup", onMouseUp);
+
+  // 表示項目（プルダウン部分）だけの折りたたみ（チャート本体は表示したまま）
+  for(const [btnId, rowId] of [["tseSelToggleBtn","tseSelRow"], ["barSelToggleBtn","barSelRow"]]){
+    const btn = document.getElementById(btnId);
+    const row = document.getElementById(rowId);
+    if(!btn || !row) continue;
+    btn.addEventListener("click", ()=>{
+      const hidden = row.classList.toggle("hidden");
+      btn.textContent = hidden ? "＋" : "－";
+    });
+  }
 
   // 各チャートの縮小（－ボタンでプルダウンとチャート本体を折りたたみ）
   for(const [btnId, cardId] of [["idxToggleBtn","idxCard"], ["tseToggleBtn","tseCard"], ["barToggleBtn","barCard"]]){
