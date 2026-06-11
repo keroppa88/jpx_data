@@ -1422,6 +1422,27 @@ function onMouseUp(){
 function onMouseLeave(){
   if(isDragging) onMouseUp();
   tooltip.style.display='none';
+  if(hoverDateIdx != null){
+    hoverDateIdx = null;
+    redrawAll();
+  }
+}
+
+// 十字カーソル位置の更新（カーソル下の時系列スロットを特定し、全チャートに縦線を引く）
+function updateHoverIndex(e, canvas){
+  const pps = canvas.pointPositions;
+  if(!pps || pps.length === 0) return;
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  let idx = null;
+  for(let i=0; i<pps.length; i++){
+    const pp = pps[i];
+    if(mouseX >= pp.x - pp.w/2 && mouseX <= pp.x + pp.w/2){ idx = i; break; }
+  }
+  if(idx !== hoverDateIdx){
+    hoverDateIdx = idx;
+    redrawAll();
+  }
 }
 
 /* ========= redraw ========= */
@@ -1722,6 +1743,21 @@ async function autoLoad(){
   }
   if(tseAvail.length === 0) tseAvail = tseNamesFromData;
 
+  // メニューを分割：累積チャート＝「ー差引累計ー」グループ、増減チャート＝「ー個別項目ー」グループ
+  cumAvail = [];
+  barAvail = [];
+  {
+    let group = "";
+    for(const n of tseAvail){
+      const t = n.trim();
+      if(t.startsWith("ー") && t.endsWith("ー")){ group = t; continue; }
+      if(group === "ー個別項目ー") barAvail.push(n);
+      else cumAvail.push(n);
+    }
+  }
+  if(cumAvail.length === 0) cumAvail = tseAvail;
+  if(barAvail.length === 0) barAvail = tseNamesFromData.filter(n => !n.endsWith("_差引累計"));
+
   // 日付軸
   idxDates = buildDateList(idxRows);
   tseDates = buildDateList(tseRows);
@@ -1765,6 +1801,39 @@ async function autoLoad(){
     }
   }catch(e){}
 
+  // 増減チャートの選択状態を復元
+  try{
+    const raw = localStorage.getItem("barKeys_v1");
+    if(raw){
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr)){
+        barKeys = new Array(TSE_SELECTION_COUNT).fill("").map((_, i)=> arr[i] || "");
+      }
+    }
+  }catch(e){}
+  try{
+    const raw = localStorage.getItem("barColors_v1");
+    if(raw){
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr)){
+        barColors = new Array(TSE_SELECTION_COUNT).fill("").map((_, i)=> arr[i] || DEFAULT_COLORS[i]);
+      }
+    }
+  }catch(e){}
+  try{
+    const raw = localStorage.getItem("barVisible_v1");
+    if(raw){
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr)){
+        barVisible = new Array(TSE_SELECTION_COUNT).fill(true).map((_, i)=> arr[i] !== false);
+      }
+    }
+  }catch(e){}
+
+  // 旧バージョンの保存値を整理（累積チャート＝累計項目のみ、増減チャート＝個別項目のみ）
+  tseKeys = tseKeys.map(k => (k && k.endsWith("_差引累計")) ? k : "");
+  barKeys = barKeys.map(k => (k && !k.endsWith("_差引累計")) ? k : "");
+
   // デフォルト値設定
   // 株価指数のデフォルト: TOPIX終値
   if(!idxKey){
@@ -1803,6 +1872,14 @@ async function autoLoad(){
     }
   }
 
+  // 増減チャートのデフォルト：個人・海外投資家の差引
+  const defaultBarKeys = ["個人_差引", "海外投資家_差引", "", "", "", "", "", ""];
+  for(let i=0; i<TSE_SELECTION_COUNT; i++){
+    if(!barKeys[i] && defaultBarKeys[i] && barAvail.some(n => extractKeyFromDisplayName(n) === defaultBarKeys[i])){
+      barKeys[i] = defaultBarKeys[i];
+    }
+  }
+
   const baseDatesLoaded = tseDates.length > 0 ? tseDates : globalDates;
   displayCount = Math.max(10, Math.min(displayCount, MAX_DISPLAY, baseDatesLoaded.length || displayCount));
   offsetX = 0;
@@ -1820,26 +1897,39 @@ async function autoLoad(){
 function init(){
   idxCanvas = document.getElementById("idxChart");
   tseCanvas = document.getElementById("tseChart");
+  barCanvas = document.getElementById("barChart");
   idxCtx = idxCanvas.getContext("2d");
   tseCtx = tseCanvas.getContext("2d");
+  barCtx = barCanvas.getContext("2d");
   tooltip = document.getElementById("tooltip");
 
   bindControls();
   const doResize = ()=>{
     resizeCanvas(idxCanvas);
     resizeCanvas(tseCanvas);
+    resizeCanvas(barCanvas);
     redrawAll();
   };
   window.addEventListener("resize", doResize);
   doResize();
 
-  for(const c of [idxCanvas, tseCanvas]){
+  // 各チャートの上下幅調節（canvasBoxのCSS resizeに追従して再描画）
+  if(window.ResizeObserver){
+    const ro = new ResizeObserver(()=>{ doResize(); });
+    for(const id of ["idxBox", "tseBox", "barBox"]){
+      const box = document.getElementById(id);
+      if(box) ro.observe(box);
+    }
+  }
+
+  for(const c of [idxCanvas, tseCanvas, barCanvas]){
     c.addEventListener("wheel", onWheelZoom, {passive:false});
     c.addEventListener("mousedown", (e)=>onMouseDown(e, c));
     c.addEventListener("mousemove", (e)=>{
       onMouseMove(e);
       if(!isDragging){
-        const data = (c === idxCanvas ? idxData : tseData);
+        updateHoverIndex(e, c);
+        const data = (c === idxCanvas ? idxData : (c === tseCanvas ? tseData : barData));
         showTooltipForCanvas(e, c, data);
       }
     });
@@ -1848,21 +1938,17 @@ function init(){
   }
   window.addEventListener("mouseup", onMouseUp);
 
-  // 株価指数プルダウンの表示/非表示トグル
-  const idxToggleBtn = document.getElementById("idxToggleBtn");
-  const idxSelContainer = document.getElementById("idxSelContainer");
-  idxToggleBtn.addEventListener("click", ()=>{
-    const isHidden = idxSelContainer.classList.toggle("hidden");
-    idxToggleBtn.textContent = isHidden ? "＋" : "－";
-  });
-
-  // 部門別プルダウンの表示/非表示トグル
-  const tseToggleBtn = document.getElementById("tseToggleBtn");
-  const tseSelContainer = document.getElementById("tseSelContainer");
-  tseToggleBtn.addEventListener("click", ()=>{
-    const isHidden = tseSelContainer.classList.toggle("hidden");
-    tseToggleBtn.textContent = isHidden ? "＋" : "－";
-  });
+  // 各チャートの縮小（－ボタンでプルダウンとチャート本体を折りたたみ）
+  for(const [btnId, cardId] of [["idxToggleBtn","idxCard"], ["tseToggleBtn","tseCard"], ["barToggleBtn","barCard"]]){
+    const btn = document.getElementById(btnId);
+    const card = document.getElementById(cardId);
+    if(!btn || !card) continue;
+    btn.addEventListener("click", ()=>{
+      const collapsed = card.classList.toggle("collapsed");
+      btn.textContent = collapsed ? "＋" : "－";
+      if(!collapsed) doResize();
+    });
+  }
 
   // 説明モーダル
   const helpBtn = document.getElementById("helpBtn");
