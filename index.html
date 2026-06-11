@@ -150,8 +150,14 @@
       color:#9ca3af;
     }
 
-    .canvasBox{ position:relative; background:#fff; }
-    canvas{ display:block; width:100%; cursor:crosshair; }
+    .canvasBox{
+      position:relative; background:#fff;
+      resize:vertical; overflow:hidden;
+      min-height:120px;
+    }
+    canvas{ display:block; width:100%; height:100%; cursor:crosshair; }
+    .chartCard.collapsed .selRow,
+    .chartCard.collapsed .canvasBox{ display:none; }
 
     .toggle-btn{
       width:28px; height:28px;
@@ -170,8 +176,9 @@
     .toggle-btn:hover{
       background:#f3f4f6;
     }
-    #idxChart{ height:240px; }
-    #tseChart{ height:480px; }
+    #idxBox{ height:240px; }
+    #tseBox{ height:420px; }
+    #barBox{ height:280px; }
 
     .tooltip{
       position:fixed;
@@ -283,7 +290,7 @@
 
         <div class="grid2">
           <!-- 株価指数チャート（プルダウン1つ） -->
-          <div class="chartCard">
+          <div class="chartCard" id="idxCard">
             <div class="chartHead">
               <div class="chartTitle">株価指数</div>
               <div class="legend" id="idxLegend"></div>
@@ -297,15 +304,15 @@
                 </div>
               </div>
             </div>
-            <div class="canvasBox">
+            <div class="canvasBox" id="idxBox">
               <canvas id="idxChart"></canvas>
             </div>
           </div>
 
-          <!-- 部門別売買動向チャート（プルダウン8個、色選択付き） -->
-          <div class="chartCard">
+          <!-- 部門別売買動向（累積）チャート（プルダウン8個、色選択付き） -->
+          <div class="chartCard" id="tseCard">
             <div class="chartHead">
-              <div class="chartTitle">部門別売買動向</div>
+              <div class="chartTitle">部門別売買動向（累積）</div>
               <div class="legend" id="tseLegend"></div>
               <button class="toggle-btn" id="tseToggleBtn" title="プルダウンの表示/非表示">－</button>
             </div>
@@ -321,8 +328,32 @@
                 <div class="sel"><div class="slot">8</div><select id="tseSel8"></select><input type="color" class="color-picker" id="tseColor8" value="#000000"><input type="checkbox" class="show-check" id="tseCheck8" checked title="表示/非表示"></div>
               </div>
             </div>
-            <div class="canvasBox">
+            <div class="canvasBox" id="tseBox">
               <canvas id="tseChart"></canvas>
+            </div>
+          </div>
+
+          <!-- 部門別売買動向（増減）チャート（発表ごとの数値を縦棒で表示） -->
+          <div class="chartCard" id="barCard">
+            <div class="chartHead">
+              <div class="chartTitle">部門別売買動向（増減）</div>
+              <div class="legend" id="barLegend"></div>
+              <button class="toggle-btn" id="barToggleBtn" title="チャートの表示/非表示">－</button>
+            </div>
+            <div class="selRow" id="barSelRow" style="padding:8px 12px;">
+              <div id="barSelContainer">
+                <div class="sel"><div class="slot">1</div><select id="barSel1"></select><input type="color" class="color-picker" id="barColor1" value="#FF4B00"><input type="checkbox" class="show-check" id="barCheck1" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">2</div><select id="barSel2"></select><input type="color" class="color-picker" id="barColor2" value="#005AFF"><input type="checkbox" class="show-check" id="barCheck2" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">3</div><select id="barSel3"></select><input type="color" class="color-picker" id="barColor3" value="#03AF7A"><input type="checkbox" class="show-check" id="barCheck3" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">4</div><select id="barSel4"></select><input type="color" class="color-picker" id="barColor4" value="#4DC4FF"><input type="checkbox" class="show-check" id="barCheck4" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">5</div><select id="barSel5"></select><input type="color" class="color-picker" id="barColor5" value="#F6AA00"><input type="checkbox" class="show-check" id="barCheck5" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">6</div><select id="barSel6"></select><input type="color" class="color-picker" id="barColor6" value="#990099"><input type="checkbox" class="show-check" id="barCheck6" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">7</div><select id="barSel7"></select><input type="color" class="color-picker" id="barColor7" value="#84919E"><input type="checkbox" class="show-check" id="barCheck7" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">8</div><select id="barSel8"></select><input type="color" class="color-picker" id="barColor8" value="#000000"><input type="checkbox" class="show-check" id="barCheck8" checked title="表示/非表示"></div>
+              </div>
+            </div>
+            <div class="canvasBox" id="barBox">
+              <canvas id="barChart"></canvas>
             </div>
           </div>
         </div>
@@ -423,6 +454,17 @@ let tseVisible = new Array(TSE_SELECTION_COUNT).fill(true);
 
 let idxData = null;
 let tseData = null;
+
+let barData = null;
+let barCanvas, barCtx;
+let barAvail = [];
+let cumAvail = [];
+let barKeys = new Array(TSE_SELECTION_COUNT).fill("");
+let barColors = [...DEFAULT_COLORS];
+let barVisible = new Array(TSE_SELECTION_COUNT).fill(true);
+
+let hoverDateIdx = null;     // 全チャート共有の十字カーソル位置（表示インデックス）
+let tseDateMeta = new Map(); // PubDate -> {st: StDate, en: EnDate}
 
 /* ========= helpers ========= */
 function cleanHeaderValue(s){
@@ -588,12 +630,15 @@ function parsePtoCsvToLong(text){
 }
 
 function parseTsePrimeToLong(text){
+  tseDateMeta = new Map();
   const lines=text.trim().split(/\r?\n/);
   if(lines.length<2) throw new Error("TSEPrime.csv: データが空です");
   const delim=detectDelimiter(lines[0]);
   const header=parseDelimitedLine(lines[0],delim).map(cleanHeaderValue);
 
   const idxPubDate=header.indexOf("PubDate") >= 0 ? header.indexOf("PubDate") : header.indexOf("公表日");
+  const idxStDate=header.indexOf("StDate") >= 0 ? header.indexOf("StDate") : header.indexOf("開始日");
+  const idxEnDate=header.indexOf("EnDate") >= 0 ? header.indexOf("EnDate") : header.indexOf("終了日");
   const idxSection=header.indexOf("Section") >= 0 ? header.indexOf("Section") : header.indexOf("市場名");
   if(idxPubDate<0) throw new Error("TSEPrime.csv: 必須列(PubDate/公表日)が見つかりません");
 
@@ -625,6 +670,10 @@ function parseTsePrimeToLong(text){
 
     const date=(cols[idxPubDate]||"").trim();
     if(!date) continue;
+
+    const st = idxStDate >= 0 ? (cols[idxStDate]||"").trim() : "";
+    const en = idxEnDate >= 0 ? (cols[idxEnDate]||"").trim() : "";
+    if(st || en) tseDateMeta.set(date, {st, en});
 
     for(const f of fieldDefs){
       const value=toNum(cols[f.idx]);
@@ -740,8 +789,9 @@ const COMPOSITE_FIELDS = {
   "法人_差引累計": ["事業法人_差引", "その他法人_差引"]
 };
 
-function buildTseSeries(rows, keys, colors, dates, visible){
+function buildTseSeries(rows, keys, colors, dates, visible, mode = "line"){
   const series = [];
+  const barMode = (mode === "bar");
 
   // 差引累計が1つでも選択されているかチェック
   const hasCumulative = keys.some((k, i) => k && k.endsWith("_差引累計") && visible[i]);
@@ -754,8 +804,8 @@ function buildTseSeries(rows, keys, colors, dates, visible){
     // 累積計算かどうかをチェック
     const isCumulative = k.endsWith("_差引累計");
 
-    // 差引累計がある場合、差引累計以外はスキップ
-    if(hasCumulative && !isCumulative) continue;
+    // 差引累計がある場合、差引累計以外はスキップ（縦棒モードでは全項目を表示）
+    if(!barMode && hasCumulative && !isCumulative) continue;
 
     // 合成項目（金融_差引累計、法人_差引累計）かどうかをチェック
     const isComposite = COMPOSITE_FIELDS.hasOwnProperty(k);
@@ -783,6 +833,11 @@ function buildTseSeries(rows, keys, colors, dates, visible){
             hasValue = true;
           }
         }
+        if(barMode){
+          // 増減縦棒: 発表ごとの差引合計をそのまま使用
+          values.push(hasValue ? sum : null);
+          continue;
+        }
         if(hasValue){
           cumulative += sum;
         }
@@ -799,6 +854,11 @@ function buildTseSeries(rows, keys, colors, dates, visible){
       for(let j=0; j<dates.length; j++){
         const d = dates[j];
         const v = map.has(d) ? map.get(d) : null;
+        if(barMode){
+          // 増減縦棒: 発表ごとの差引をそのまま使用
+          values.push(v);
+          continue;
+        }
         if(v !== null){
           cumulative += v;
         }
@@ -811,9 +871,10 @@ function buildTseSeries(rows, keys, colors, dates, visible){
       values = dates.map(d => (map.has(d) ? map.get(d) : null));
     }
 
-    series.push({ label: k, color: colors[i] || DEFAULT_COLORS[i % DEFAULT_COLORS.length], width: 2, values, isCumulative: isCumulative || isComposite, slotIndex: i });
+    const label = barMode && (isCumulative || isComposite) ? k.replace("_差引累計", "_差引") : k;
+    series.push({ label, color: colors[i] || DEFAULT_COLORS[i % DEFAULT_COLORS.length], width: 2, values, isCumulative: (isCumulative || isComposite) && !barMode, slotIndex: i });
   }
-  return { dates, series };
+  return { dates, series, chartType: barMode ? "bar" : "line" };
 }
 
 /* ========= draw ========= */
@@ -920,6 +981,23 @@ function calcIdxNiceTicks(minV, maxV, targetCount = 5){
   return ticks;
 }
 
+// 十字カーソルの縦線（全チャート共有のhoverDateIdx位置に描画）
+function drawCrosshairLine(ctx, canvas, pad, h){
+  if(hoverDateIdx == null) return;
+  const pps = canvas.pointPositions;
+  if(!pps || !pps[hoverDateIdx]) return;
+  const x = pps[hoverDateIdx].x;
+  ctx.save();
+  ctx.strokeStyle = '#374151';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([5, 3]);
+  ctx.beginPath();
+  ctx.moveTo(x, pad.t);
+  ctx.lineTo(x, h - pad.b);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, isTseChart = false){
   const w=canvas.width, h=canvas.height;
   const pad={t:14,b:28,l:12,r:90};
@@ -973,6 +1051,13 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, is
     ctx.fillStyle='#6b7280'; ctx.textAlign='center'; ctx.fillText("表示範囲にデータがありません", w/2, h/2);
     canvas.pointPositions = [];
     return;
+  }
+
+  const isBarChart = (data.chartType === "bar");
+  if(isBarChart){
+    // 縦棒はゼロ基準で描くため、0を必ず範囲に含める
+    minV = Math.min(minV, 0);
+    maxV = Math.max(maxV, 0);
   }
 
   const range=(maxV-minV)||1;
@@ -1085,6 +1170,39 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, is
   canvas.seriesOffsets = seriesOffsets;
 
   // 各系列を描画
+  if(isBarChart){
+    // 増減縦棒: 1日付スロットに系列数ぶんの棒をグループ描画（ゼロ基準）
+    const zeroY = getY(0);
+    const slotW = chartW / visibleDates.length;
+    const nSeries = data.series.length;
+    const groupW = slotW * 0.8;
+    const barW = Math.max(1, groupW / Math.max(1, nSeries));
+
+    // ゼロライン
+    ctx.strokeStyle='#9ca3af';
+    ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(pad.l, zeroY); ctx.lineTo(w-pad.r, zeroY); ctx.stroke();
+
+    for(let si=0; si<nSeries; si++){
+      const s = data.series[si];
+      ctx.fillStyle = s.color || '#000000';
+      for(let i=0; i<visibleAbsIndices.length; i++){
+        const absIdx = visibleAbsIndices[i];
+        if(absIdx == null) continue;
+        const v = getValue(s, absIdx, si);
+        if(v == null || !Number.isFinite(v)) continue;
+        const cx = getX(i);
+        const x = cx - groupW/2 + si*barW;
+        const y = getY(v);
+        const top = Math.min(y, zeroY);
+        const hgt = Math.max(1, Math.abs(zeroY - y));
+        ctx.fillRect(x, top, Math.max(1, barW - 1), hgt);
+      }
+    }
+    drawCrosshairLine(ctx, canvas, pad, h);
+    return;
+  }
+
   for(let si=0; si<data.series.length; si++){
     const s = data.series[si];
     const color = s.color || '#000000';
@@ -1127,6 +1245,8 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, is
       ctx.restore();
     }
   }
+
+  drawCrosshairLine(ctx, canvas, pad, h);
 }
 
 function formatAxisValue(v){
@@ -1212,7 +1332,17 @@ function showTooltipForCanvas(e, canvas, data){
   const absIdx = p.absIndex;
   const date = p.date || (absIdx!=null ? data.dates[absIdx] : "") || "";
   const offsets = canvas.seriesOffsets || [];
-  let html = `<strong>${date}</strong><br>`;
+
+  // 部門別チャート（累積・増減）はデータ期間（StDate～EnDate）と取得日（PubDate）を表示
+  const fmtDateSlash = (d)=> String(d||"").replace(/-/g, "/");
+  let html;
+  const meta = (canvas !== idxCanvas) ? tseDateMeta.get(date) : null;
+  if(meta && (meta.st || meta.en)){
+    html = `<strong>データ期間：${fmtDateSlash(meta.st)}～${fmtDateSlash(meta.en)}</strong><br>`
+         + `取得日：${fmtDateSlash(date)}<br>`;
+  } else {
+    html = `<strong>${fmtDateSlash(date)}</strong><br>`;
+  }
   for(let si=0; si<data.series.length; si++){
     const s = data.series[si];
     let val = (absIdx!=null ? s.values[absIdx] : null);
@@ -1304,12 +1434,17 @@ function rebuildData(){
   idxData = buildIdxSeries(idxRows, idxKey, baseDates, idxDates);
   idxData.dateIndex = buildDateIndex(baseDates);
 
-  // 部門別データ
-  tseData = buildTseSeries(tseRows, tseKeys, tseColors, baseDates, tseVisible);
+  // 部門別データ（累積折れ線）
+  tseData = buildTseSeries(tseRows, tseKeys, tseColors, baseDates, tseVisible, "line");
   tseData.dateIndex = buildDateIndex(baseDates);
+
+  // 部門別データ（増減縦棒：発表ごとの数値をそのまま使用）
+  barData = buildTseSeries(tseRows, barKeys, barColors, baseDates, barVisible, "bar");
+  barData.dateIndex = buildDateIndex(baseDates);
 
   renderLegend("idxLegend", idxData);
   renderLegend("tseLegend", tseData);
+  renderLegend("barLegend", barData);
 
   // UIの状態を更新（差引累計がある場合は他を無効化）
   updateTseSelectionUI();
@@ -1328,6 +1463,7 @@ function redrawAll(){
   // 両チャートで同じvisibleDates, visibleAbsIndicesを使用
   drawChartGeneric(idxCtx, idxCanvas, idxData, commonWindow.visibleDates, commonWindow.visibleAbsIndices, false);
   drawChartGeneric(tseCtx, tseCanvas, tseData, commonWindow.visibleDates, commonWindow.visibleAbsIndices, true);
+  drawChartGeneric(barCtx, barCanvas, barData, commonWindow.visibleDates, commonWindow.visibleAbsIndices, true);
 }
 
 /* ========= select UI ========= */
@@ -1445,13 +1581,13 @@ function bindSelects(){
     redrawAll();
   });
 
-  // 部門別セレクト（8つ）
+  // 部門別セレクト（累積：8つ、差引累計項目のみ）
   for(let i=0; i<TSE_SELECTION_COUNT; i++){
     const sel = document.getElementById(`tseSel${i+1}`);
     const colorPicker = document.getElementById(`tseColor${i+1}`);
     const checkbox = document.getElementById(`tseCheck${i+1}`);
 
-    fillTseSelect(sel, tseAvail, tseKeys[i]);
+    fillTseSelect(sel, cumAvail, tseKeys[i]);
     colorPicker.value = tseColors[i];
     checkbox.checked = tseVisible[i];
 
@@ -1485,6 +1621,41 @@ function bindSelects(){
     checkbox.addEventListener("change", ()=>{
       tseVisible[i] = checkbox.checked;
       try{ localStorage.setItem("tseVisible_v2", JSON.stringify(tseVisible)); }catch(e){}
+      redrawAll();
+    });
+  }
+
+  // 部門別セレクト（増減：8つ、個別項目のみ）
+  for(let i=0; i<TSE_SELECTION_COUNT; i++){
+    const sel = document.getElementById(`barSel${i+1}`);
+    const colorPicker = document.getElementById(`barColor${i+1}`);
+    const checkbox = document.getElementById(`barCheck${i+1}`);
+
+    fillTseSelect(sel, barAvail, barKeys[i]);
+    colorPicker.value = barColors[i];
+    checkbox.checked = barVisible[i];
+
+    sel.addEventListener("focus", ()=>{ restoreSelectDisplay(sel); });
+    sel.addEventListener("blur", ()=>{ updateSelectDisplay(sel); });
+
+    sel.addEventListener("change", ()=>{
+      barKeys[i] = sel.value || "";
+      if(barKeys[i]) barVisible[i] = true;
+      try{ localStorage.setItem("barKeys_v1", JSON.stringify(barKeys)); }catch(e){}
+      try{ localStorage.setItem("barVisible_v1", JSON.stringify(barVisible)); }catch(e){}
+      updateSelectDisplay(sel);
+      redrawAll();
+    });
+
+    colorPicker.addEventListener("input", ()=>{
+      barColors[i] = colorPicker.value;
+      try{ localStorage.setItem("barColors_v1", JSON.stringify(barColors)); }catch(e){}
+      redrawAll();
+    });
+
+    checkbox.addEventListener("change", ()=>{
+      barVisible[i] = checkbox.checked;
+      try{ localStorage.setItem("barVisible_v1", JSON.stringify(barVisible)); }catch(e){}
       redrawAll();
     });
   }
