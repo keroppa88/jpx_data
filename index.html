@@ -929,12 +929,22 @@ function renderLegend(elId, data){
   if(!box) return;
   box.innerHTML = '';
   if(!data || !data.series || data.series.length===0) return;
+  const colorPrefix = elId === "tseLegend" ? "tseColor" : (elId === "barLegend" ? "barColor" : null);
   for(const s of data.series){
     const item = document.createElement('div');
     item.className = 'legend-item';
     const sw = document.createElement('span');
     sw.className = 'swatch';
     sw.style.background = s.color;
+    // 凡例の色をクリックでカラーピッカーを開く
+    if(colorPrefix && s.slotIndex != null){
+      const picker = document.getElementById(colorPrefix + (s.slotIndex + 1));
+      if(picker){
+        sw.style.cursor = "pointer";
+        sw.title = "クリックで色を変更";
+        sw.addEventListener("click", ()=> picker.click());
+      }
+    }
     item.appendChild(sw);
     const txt = document.createElement('span');
     txt.textContent = s.label;
@@ -2018,6 +2028,52 @@ function init(){
     c.addEventListener("mouseleave", onMouseLeave);
   }
   window.addEventListener("mouseup", onMouseUp);
+
+  // チャートの並び替え（↑↓ボタン）と保存順の復元
+  {
+    const cardIds = ["idxCard", "tseCard", "barCard"];
+    const parent = document.getElementById("idxCard").parentElement;
+    try{
+      const order = JSON.parse(localStorage.getItem("chartOrder_v1") || "null");
+      if(Array.isArray(order)){
+        for(const id of order){
+          const el = document.getElementById(id);
+          if(el && cardIds.includes(id)) parent.appendChild(el);
+        }
+      }
+    }catch(e){}
+    const saveOrder = ()=>{
+      const order = [...parent.querySelectorAll(".chartCard")].map(el => el.id);
+      try{ localStorage.setItem("chartOrder_v1", JSON.stringify(order)); }catch(e){}
+    };
+    for(const id of cardIds){
+      const card = document.getElementById(id);
+      const head = card.querySelector(".chartHead");
+      const ref = head.querySelector(".toggle-btn");
+      const mk = (txt, title)=>{
+        const b = document.createElement("button");
+        b.className = "toggle-btn sel-toggle-btn";
+        b.textContent = txt;
+        b.title = title;
+        head.insertBefore(b, ref);
+        return b;
+      };
+      mk("↑", "チャートを上へ移動").addEventListener("click", ()=>{
+        const prev = card.previousElementSibling;
+        if(prev && prev.classList.contains("chartCard")){
+          parent.insertBefore(card, prev);
+          saveOrder();
+        }
+      });
+      mk("↓", "チャートを下へ移動").addEventListener("click", ()=>{
+        const next = card.nextElementSibling;
+        if(next && next.classList.contains("chartCard")){
+          parent.insertBefore(next, card);
+          saveOrder();
+        }
+      });
+    }
+  }
 
   // 表示項目（プルダウン部分）だけの折りたたみ（チャート本体は表示したまま）
   for(const [btnId, rowId] of [["tseSelToggleBtn","tseSelRow"], ["barSelToggleBtn","barSelRow"]]){
