@@ -1070,7 +1070,7 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, is
 
   ctx.clearRect(0,0,w,h);
 
-  ctx.font = "26px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
+  ctx.font = "22px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
 
   if(!data || !data.series || data.series.length===0 || !data.dates || data.dates.length===0){
     ctx.fillStyle='#6b7280';
@@ -1161,7 +1161,7 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, is
       const y = getY(t);
 
       // メイングリッド線
-      ctx.strokeStyle='#e0e0e0';
+      ctx.strokeStyle='#9ca3af';
       ctx.lineWidth=1;
       ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
 
@@ -1173,7 +1173,7 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, is
       // 補助線（次のティックとの間に1本）
       if(i < ticks.length - 1){
         const midY = getY(t + tickInterval / 2);
-        ctx.strokeStyle='#f0f0f0';
+        ctx.strokeStyle='#c8cdd5';
         ctx.lineWidth=1;
         ctx.setLineDash([4, 4]);
         ctx.beginPath(); ctx.moveTo(pad.l, midY); ctx.lineTo(w-pad.r, midY); ctx.stroke();
@@ -1186,7 +1186,7 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, is
     for(let i=0;i<=gridSteps;i++){
       const y=pad.t+(chartH*i/gridSteps);
       const v=plotMaxV-(plotMaxV-plotMinV)*(i/gridSteps);
-      ctx.strokeStyle='#e0e0e0'; ctx.lineWidth=1;
+      ctx.strokeStyle='#9ca3af'; ctx.lineWidth=1;
       ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
       ctx.fillStyle='#374151'; ctx.textAlign='left';
       const formattedVal = isTseChart ? formatTseAxisValue(v) : formatIdxAxisValue(v);
@@ -1196,7 +1196,7 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, is
 
   // 日付ライン（縦線）：表示幅をdateLineDivisions等分した位置に描画
   if(dateLineDivisions > 0){
-    ctx.strokeStyle='#e5e7eb';
+    ctx.strokeStyle='#9ca3af';
     ctx.lineWidth=1;
     for(let k=0; k<=dateLineDivisions; k++){
       const x = pad.l + chartW * k / dateLineDivisions;
