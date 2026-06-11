@@ -170,6 +170,11 @@
     canvas{ display:block; width:100%; height:100%; cursor:crosshair; }
     .chartCard.collapsed .selRow,
     .chartCard.collapsed .canvasBox{ display:none; }
+    .selRow.hidden{ display:none; }
+    .sel-toggle-btn{
+      width:24px; height:24px;
+      font-size:14px;
+    }
 
     .toggle-btn{
       width:28px; height:28px;
@@ -326,7 +331,8 @@
             <div class="chartHead">
               <div class="chartTitle">部門別売買動向（累積）</div>
               <div class="legend" id="tseLegend"></div>
-              <button class="toggle-btn" id="tseToggleBtn" title="プルダウンの表示/非表示">－</button>
+              <button class="toggle-btn sel-toggle-btn" id="tseSelToggleBtn" title="表示項目の表示/非表示">－</button>
+              <button class="toggle-btn" id="tseToggleBtn" title="チャートの表示/非表示">－</button>
             </div>
             <div class="selRow" id="tseSelRow" style="padding:8px 12px;">
               <div id="tseSelContainer">
@@ -350,6 +356,7 @@
             <div class="chartHead">
               <div class="chartTitle">部門別売買動向（増減）</div>
               <div class="legend" id="barLegend"></div>
+              <button class="toggle-btn sel-toggle-btn" id="barSelToggleBtn" title="表示項目の表示/非表示">－</button>
               <button class="toggle-btn" id="barToggleBtn" title="チャートの表示/非表示">－</button>
             </div>
             <div class="canvasBox" id="barBox">
@@ -1949,6 +1956,17 @@ function init(){
     c.addEventListener("mouseleave", onMouseLeave);
   }
   window.addEventListener("mouseup", onMouseUp);
+
+  // 表示項目（プルダウン部分）だけの折りたたみ（チャート本体は表示したまま）
+  for(const [btnId, rowId] of [["tseSelToggleBtn","tseSelRow"], ["barSelToggleBtn","barSelRow"]]){
+    const btn = document.getElementById(btnId);
+    const row = document.getElementById(rowId);
+    if(!btn || !row) continue;
+    btn.addEventListener("click", ()=>{
+      const hidden = row.classList.toggle("hidden");
+      btn.textContent = hidden ? "＋" : "－";
+    });
+  }
 
   // 各チャートの縮小（－ボタンでプルダウンとチャート本体を折りたたみ）
   for(const [btnId, cardId] of [["idxToggleBtn","idxCard"], ["tseToggleBtn","tseCard"], ["barToggleBtn","barCard"]]){
