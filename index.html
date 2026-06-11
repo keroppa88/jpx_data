@@ -215,6 +215,26 @@
     .toggle-btn:hover{
       background:#f3f4f6;
     }
+    /* チャート領域内のオーバーレイ（題名＋凡例、ドラッグで移動可能） */
+    .chartHead{ justify-content:flex-end; }
+    .chartOverlay{
+      position:absolute; left:12px; top:8px; z-index:5;
+      background:rgba(255,255,255,0.88);
+      border:1px solid var(--line);
+      border-radius:10px;
+      padding:6px 12px;
+      cursor:move;
+      user-select:none;
+      touch-action:none;
+      max-width:75%;
+    }
+    .chartOverlay .ovTitle{ font-weight:700; font-size:22px; color:#111827; }
+    .headRestoreBtn{
+      position:absolute; top:6px; right:6px; z-index:6;
+      display:none;
+    }
+    .chartCard.headHidden .chartHead{ display:none; }
+    .chartCard.headHidden .headRestoreBtn{ display:flex; }
     #idxBox{ height:240px; }
     #tseBox{ height:420px; }
     #barBox{ height:280px; }
@@ -328,9 +348,8 @@
           <!-- 株価指数チャート（プルダウン1つ） -->
           <div class="chartCard" id="idxCard">
             <div class="chartHead">
-              <div class="chartTitle">株価指数</div>
-              <div class="legend" id="idxLegend"></div>
-              <button class="toggle-btn" id="idxToggleBtn" title="プルダウンの表示/非表示">－</button>
+              <button class="toggle-btn" id="idxToggleBtn" title="チャートの表示/非表示">－</button>
+              <button class="toggle-btn" id="idxHeadHideBtn" title="この操作バーを隠す">－</button>
             </div>
             <div class="selRow" id="idxSelRow" style="padding:8px 12px;">
               <div id="idxSelContainer">
@@ -342,6 +361,11 @@
             </div>
             <div class="canvasBox" id="idxBox">
               <canvas id="idxChart"></canvas>
+              <div class="chartOverlay" data-pos="idx" title="ドラッグで移動">
+                <div class="ovTitle">株価指数</div>
+                <div class="legend" id="idxLegend"></div>
+              </div>
+              <button class="toggle-btn headRestoreBtn" title="操作バーを表示">＋</button>
             </div>
             <div class="resizeHandle" data-target="idxBox" title="ドラッグで高さ調節"></div>
           </div>
@@ -349,10 +373,9 @@
           <!-- 部門別売買動向（累積）チャート（プルダウン8個、色選択付き） -->
           <div class="chartCard" id="tseCard">
             <div class="chartHead">
-              <div class="chartTitle">部門別売買動向（累積）</div>
-              <div class="legend" id="tseLegend"></div>
               <button class="toggle-btn sel-toggle-btn" id="tseSelToggleBtn" title="表示項目の表示/非表示">－</button>
               <button class="toggle-btn" id="tseToggleBtn" title="チャートの表示/非表示">－</button>
+              <button class="toggle-btn" id="tseHeadHideBtn" title="この操作バーを隠す">－</button>
             </div>
             <div class="selRow" id="tseSelRow" style="padding:8px 12px;">
               <div id="tseSelContainer">
@@ -368,6 +391,11 @@
             </div>
             <div class="canvasBox" id="tseBox">
               <canvas id="tseChart"></canvas>
+              <div class="chartOverlay" data-pos="tse" title="ドラッグで移動">
+                <div class="ovTitle">部門別売買動向（累積）</div>
+                <div class="legend" id="tseLegend"></div>
+              </div>
+              <button class="toggle-btn headRestoreBtn" title="操作バーを表示">＋</button>
             </div>
             <div class="resizeHandle" data-target="tseBox" title="ドラッグで高さ調節"></div>
           </div>
@@ -375,10 +403,9 @@
           <!-- 部門別売買動向（増減）チャート（発表ごとの数値を縦棒で表示） -->
           <div class="chartCard" id="barCard">
             <div class="chartHead">
-              <div class="chartTitle">部門別売買動向（増減）</div>
-              <div class="legend" id="barLegend"></div>
               <button class="toggle-btn sel-toggle-btn" id="barSelToggleBtn" title="表示項目の表示/非表示">－</button>
               <button class="toggle-btn" id="barToggleBtn" title="チャートの表示/非表示">－</button>
+              <button class="toggle-btn" id="barHeadHideBtn" title="この操作バーを隠す">－</button>
             </div>
             <div class="selRow" id="barSelRow" style="padding:8px 12px;">
               <div id="barSelContainer">
@@ -394,6 +421,11 @@
             </div>
             <div class="canvasBox" id="barBox">
               <canvas id="barChart"></canvas>
+              <div class="chartOverlay" data-pos="bar" title="ドラッグで移動">
+                <div class="ovTitle">部門別売買動向（増減）</div>
+                <div class="legend" id="barLegend"></div>
+              </div>
+              <button class="toggle-btn headRestoreBtn" title="操作バーを表示">＋</button>
             </div>
             <div class="resizeHandle" data-target="barBox" title="ドラッグで高さ調節"></div>
           </div>
@@ -2083,6 +2115,62 @@ function init(){
           saveOrder();
         }
       });
+    }
+  }
+
+  // チャート領域内のオーバーレイ（題名＋凡例）をドラッグで移動
+  {
+    let ovPos = {};
+    try{ ovPos = JSON.parse(localStorage.getItem("overlayPos_v1") || "{}") || {}; }catch(e){}
+    for(const ov of document.querySelectorAll(".chartOverlay")){
+      const key = ov.dataset.pos;
+      const box = ov.parentElement;
+      const p = ovPos[key];
+      if(p && Number.isFinite(p.x) && Number.isFinite(p.y)){
+        ov.style.left = p.x + "px";
+        ov.style.top = p.y + "px";
+      }
+      ov.addEventListener("pointerdown", (e)=>{
+        if(e.target.closest(".swatch")) return; // 凡例の色クリックはドラッグにしない
+        e.preventDefault();
+        ov.setPointerCapture(e.pointerId);
+        const startX = e.clientX, startY = e.clientY;
+        const startL = ov.offsetLeft, startT = ov.offsetTop;
+        const onMove = (ev)=>{
+          const maxL = Math.max(0, box.clientWidth - ov.offsetWidth);
+          const maxT = Math.max(0, box.clientHeight - ov.offsetHeight);
+          ov.style.left = Math.min(Math.max(0, startL + ev.clientX - startX), maxL) + "px";
+          ov.style.top = Math.min(Math.max(0, startT + ev.clientY - startY), maxT) + "px";
+        };
+        const onUp = ()=>{
+          ov.removeEventListener("pointermove", onMove);
+          ov.removeEventListener("pointerup", onUp);
+          ovPos[key] = {x: ov.offsetLeft, y: ov.offsetTop};
+          try{ localStorage.setItem("overlayPos_v1", JSON.stringify(ovPos)); }catch(err){}
+        };
+        ov.addEventListener("pointermove", onMove);
+        ov.addEventListener("pointerup", onUp);
+      });
+    }
+  }
+
+  // 操作バー（ヘッダー）の表示/非表示（－で隠し、チャート右上の＋で復元）
+  {
+    let hh = {};
+    try{ hh = JSON.parse(localStorage.getItem("headHidden_v1") || "{}") || {}; }catch(e){}
+    for(const [btnId, cardId] of [["idxHeadHideBtn","idxCard"], ["tseHeadHideBtn","tseCard"], ["barHeadHideBtn","barCard"]]){
+      const btn = document.getElementById(btnId);
+      const card = document.getElementById(cardId);
+      const restore = card.querySelector(".headRestoreBtn");
+      if(!btn || !card || !restore) continue;
+      const apply = (hidden)=>{
+        card.classList.toggle("headHidden", hidden);
+        hh[cardId] = hidden;
+        try{ localStorage.setItem("headHidden_v1", JSON.stringify(hh)); }catch(e){}
+      };
+      if(hh[cardId]) apply(true);
+      btn.addEventListener("click", ()=> apply(true));
+      restore.addEventListener("click", ()=> apply(false));
     }
   }
 
