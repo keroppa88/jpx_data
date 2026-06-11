@@ -95,6 +95,18 @@
       flex-wrap:wrap;
       align-items:center;
     }
+    /* 増減チャートの表示項目は横4×縦2のグリッド */
+    #barSelContainer{
+      display:grid;
+      grid-template-columns:repeat(4, minmax(0, 1fr));
+      gap:8px;
+      width:100%;
+    }
+    #barSelContainer select{
+      min-width:0;
+      flex:1;
+      width:100%;
+    }
     #tseSelContainer.hidden, #idxSelContainer.hidden{
       display:none;
     }
@@ -340,6 +352,9 @@
               <div class="legend" id="barLegend"></div>
               <button class="toggle-btn" id="barToggleBtn" title="チャートの表示/非表示">－</button>
             </div>
+            <div class="canvasBox" id="barBox">
+              <canvas id="barChart"></canvas>
+            </div>
             <div class="selRow" id="barSelRow" style="padding:8px 12px;">
               <div id="barSelContainer">
                 <div class="sel"><div class="slot">1</div><select id="barSel1"></select><input type="color" class="color-picker" id="barColor1" value="#FF4B00"><input type="checkbox" class="show-check" id="barCheck1" checked title="表示/非表示"></div>
@@ -351,9 +366,6 @@
                 <div class="sel"><div class="slot">7</div><select id="barSel7"></select><input type="color" class="color-picker" id="barColor7" value="#84919E"><input type="checkbox" class="show-check" id="barCheck7" checked title="表示/非表示"></div>
                 <div class="sel"><div class="slot">8</div><select id="barSel8"></select><input type="color" class="color-picker" id="barColor8" value="#000000"><input type="checkbox" class="show-check" id="barCheck8" checked title="表示/非表示"></div>
               </div>
-            </div>
-            <div class="canvasBox" id="barBox">
-              <canvas id="barChart"></canvas>
             </div>
           </div>
         </div>
