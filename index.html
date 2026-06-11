@@ -164,9 +164,31 @@
 
     .canvasBox{
       position:relative; background:#fff;
-      resize:vertical; overflow:hidden;
+      overflow:hidden;
       min-height:120px;
     }
+    /* チャート下端のドラッグハンドル（上下に動かして高さ調節） */
+    .resizeHandle{
+      height:10px;
+      cursor:ns-resize;
+      background:#eef1f5;
+      border-top:1px solid var(--line);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      touch-action:none;
+      user-select:none;
+    }
+    .resizeHandle::before{
+      content:"";
+      width:44px;
+      height:3px;
+      border-radius:2px;
+      background:#c3c9d4;
+    }
+    .resizeHandle:hover{ background:#e2e7ee; }
+    .resizeHandle:hover::before{ background:#9aa3b2; }
+    .chartCard.collapsed .resizeHandle{ display:none; }
     canvas{ display:block; width:100%; height:100%; cursor:crosshair; }
     .chartCard.collapsed .selRow,
     .chartCard.collapsed .canvasBox{ display:none; }
@@ -324,6 +346,7 @@
             <div class="canvasBox" id="idxBox">
               <canvas id="idxChart"></canvas>
             </div>
+            <div class="resizeHandle" data-target="idxBox" title="ドラッグで高さ調節"></div>
           </div>
 
           <!-- 部門別売買動向（累積）チャート（プルダウン8個、色選択付き） -->
@@ -349,6 +372,7 @@
             <div class="canvasBox" id="tseBox">
               <canvas id="tseChart"></canvas>
             </div>
+            <div class="resizeHandle" data-target="tseBox" title="ドラッグで高さ調節"></div>
           </div>
 
           <!-- 部門別売買動向（増減）チャート（発表ごとの数値を縦棒で表示） -->
@@ -374,6 +398,7 @@
             <div class="canvasBox" id="barBox">
               <canvas id="barChart"></canvas>
             </div>
+            <div class="resizeHandle" data-target="barBox" title="ドラッグで高さ調節"></div>
           </div>
         </div>
       </div>
@@ -1933,6 +1958,41 @@ function init(){
   };
   window.addEventListener("resize", doResize);
   doResize();
+
+  // 保存済みのチャート高さを復元
+  try{
+    const saved = JSON.parse(localStorage.getItem("chartHeights_v1") || "{}");
+    for(const id of ["idxBox", "tseBox", "barBox"]){
+      const h = parseInt(saved[id], 10);
+      if(h >= 120) document.getElementById(id).style.height = h + "px";
+    }
+  }catch(e){}
+
+  // ドラッグハンドルで各チャートの高さを調節
+  for(const handle of document.querySelectorAll(".resizeHandle")){
+    const box = document.getElementById(handle.dataset.target);
+    if(!box) continue;
+    handle.addEventListener("pointerdown", (e)=>{
+      e.preventDefault();
+      handle.setPointerCapture(e.pointerId);
+      const startY = e.clientY;
+      const startH = box.getBoundingClientRect().height;
+      const onMove = (ev)=>{
+        box.style.height = Math.max(120, startH + (ev.clientY - startY)) + "px";
+      };
+      const onUp = ()=>{
+        handle.removeEventListener("pointermove", onMove);
+        handle.removeEventListener("pointerup", onUp);
+        try{
+          const saved = JSON.parse(localStorage.getItem("chartHeights_v1") || "{}");
+          saved[handle.dataset.target] = Math.round(box.getBoundingClientRect().height);
+          localStorage.setItem("chartHeights_v1", JSON.stringify(saved));
+        }catch(err){}
+      };
+      handle.addEventListener("pointermove", onMove);
+      handle.addEventListener("pointerup", onUp);
+    });
+  }
 
   // 各チャートの上下幅調節（canvasBoxのCSS resizeに追従して再描画）
   if(window.ResizeObserver){
