@@ -246,12 +246,13 @@
     }
     .chartOverlay .ovResize:hover::before{ background:#9aa3b2; }
     .chartOverlay .ovTitle{ font-weight:700; font-size:22px; color:#111827; }
-    .headRestoreBtn{
+    /* チャート右上の常時表示ボタン（左＝タブ、右＝項目選択欄の表示/非表示） */
+    .boxBtns{
       position:absolute; top:6px; right:6px; z-index:6;
-      display:none;
+      display:flex; gap:6px;
     }
+    .boxBtns .toggle-btn{ width:38px; height:38px; font-size:22px; opacity:0.85; }
     .chartCard.headHidden .chartHead{ display:none; }
-    .chartCard.headHidden .headRestoreBtn{ display:flex; }
     #idxBox{ height:240px; }
     #tseBox{ height:420px; }
     #barBox{ height:280px; }
@@ -365,16 +366,18 @@
           <!-- 株価指数チャート（プルダウン1つ） -->
           <div class="chartCard" id="idxCard">
             <div class="chartHead">
-              <button class="toggle-btn sel-toggle-btn" id="idxSelToggleBtn" title="表示項目の表示/非表示">－</button>
               <button class="toggle-btn" id="idxToggleBtn" title="チャートの表示/非表示">－</button>
-              <button class="toggle-btn" id="idxHeadHideBtn" title="この操作バーを隠す">－</button>
             </div>
             <div class="selRow" id="idxSelRow" style="padding:8px 12px;">
               <div id="idxSelContainer">
-                <div class="sel">
-                  <div class="slot" id="idxSlotLabel">銘柄</div>
-                  <select id="idxSel1"></select>
-                </div>
+                <div class="sel"><div class="slot">1</div><select id="idxSel1"></select><input type="color" class="color-picker" id="idxColor1" value="#2563eb"><input type="checkbox" class="show-check" id="idxCheck1" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">2</div><select id="idxSel2"></select><input type="color" class="color-picker" id="idxColor2" value="#FF4B00"><input type="checkbox" class="show-check" id="idxCheck2" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">3</div><select id="idxSel3"></select><input type="color" class="color-picker" id="idxColor3" value="#03AF7A"><input type="checkbox" class="show-check" id="idxCheck3" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">4</div><select id="idxSel4"></select><input type="color" class="color-picker" id="idxColor4" value="#4DC4FF"><input type="checkbox" class="show-check" id="idxCheck4" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">5</div><select id="idxSel5"></select><input type="color" class="color-picker" id="idxColor5" value="#F6AA00"><input type="checkbox" class="show-check" id="idxCheck5" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">6</div><select id="idxSel6"></select><input type="color" class="color-picker" id="idxColor6" value="#990099"><input type="checkbox" class="show-check" id="idxCheck6" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">7</div><select id="idxSel7"></select><input type="color" class="color-picker" id="idxColor7" value="#84919E"><input type="checkbox" class="show-check" id="idxCheck7" checked title="表示/非表示"></div>
+                <div class="sel"><div class="slot">8</div><select id="idxSel8"></select><input type="color" class="color-picker" id="idxColor8" value="#000000"><input type="checkbox" class="show-check" id="idxCheck8" checked title="表示/非表示"></div>
               </div>
             </div>
             <div class="canvasBox" id="idxBox">
@@ -383,7 +386,7 @@
                 <div class="ovTitle">株価指数</div>
                 <div class="legend" id="idxLegend"></div><div class="ovResize" title="ドラッグで幅を変更"></div>
               </div>
-              <button class="toggle-btn headRestoreBtn" title="操作バーを表示">＋</button>
+              <div class="boxBtns"><button class="toggle-btn tabBtn" data-card="idxCard" title="タブ（操作バー）の表示/非表示">－</button><button class="toggle-btn selBtn" data-row="idxSelRow" title="項目選択欄の表示/非表示">－</button></div>
             </div>
             <div class="resizeHandle" data-target="idxBox" title="ドラッグで高さ調節"></div>
           </div>
@@ -391,9 +394,7 @@
           <!-- 部門別売買動向（累積）チャート（プルダウン8個、色選択付き） -->
           <div class="chartCard" id="tseCard">
             <div class="chartHead">
-              <button class="toggle-btn sel-toggle-btn" id="tseSelToggleBtn" title="表示項目の表示/非表示">－</button>
               <button class="toggle-btn" id="tseToggleBtn" title="チャートの表示/非表示">－</button>
-              <button class="toggle-btn" id="tseHeadHideBtn" title="この操作バーを隠す">－</button>
             </div>
             <div class="selRow" id="tseSelRow" style="padding:8px 12px;">
               <div id="tseSelContainer">
@@ -413,7 +414,7 @@
                 <div class="ovTitle">部門別売買動向（累積）</div>
                 <div class="legend" id="tseLegend"></div><div class="ovResize" title="ドラッグで幅を変更"></div>
               </div>
-              <button class="toggle-btn headRestoreBtn" title="操作バーを表示">＋</button>
+              <div class="boxBtns"><button class="toggle-btn tabBtn" data-card="tseCard" title="タブ（操作バー）の表示/非表示">－</button><button class="toggle-btn selBtn" data-row="tseSelRow" title="項目選択欄の表示/非表示">－</button></div>
             </div>
             <div class="resizeHandle" data-target="tseBox" title="ドラッグで高さ調節"></div>
           </div>
@@ -421,9 +422,7 @@
           <!-- 部門別売買動向（増減）チャート（発表ごとの数値を縦棒で表示） -->
           <div class="chartCard" id="barCard">
             <div class="chartHead">
-              <button class="toggle-btn sel-toggle-btn" id="barSelToggleBtn" title="表示項目の表示/非表示">－</button>
               <button class="toggle-btn" id="barToggleBtn" title="チャートの表示/非表示">－</button>
-              <button class="toggle-btn" id="barHeadHideBtn" title="この操作バーを隠す">－</button>
             </div>
             <div class="selRow" id="barSelRow" style="padding:8px 12px;">
               <div id="barSelContainer">
@@ -443,7 +442,7 @@
                 <div class="ovTitle">部門別売買動向（増減）</div>
                 <div class="legend" id="barLegend"></div><div class="ovResize" title="ドラッグで幅を変更"></div>
               </div>
-              <button class="toggle-btn headRestoreBtn" title="操作バーを表示">＋</button>
+              <div class="boxBtns"><button class="toggle-btn tabBtn" data-card="barCard" title="タブ（操作バー）の表示/非表示">－</button><button class="toggle-btn selBtn" data-row="barSelRow" title="項目選択欄の表示/非表示">－</button></div>
             </div>
             <div class="resizeHandle" data-target="barBox" title="ドラッグで高さ調節"></div>
           </div>
@@ -538,7 +537,10 @@ let idxCanvas, idxCtx, tseCanvas, tseCtx, tooltip;
 let idxAvail = [];
 let tseAvail = [];
 
-let idxKey = "";
+const IDX_DEFAULT_COLORS = ["#2563eb", "#FF4B00", "#03AF7A", "#4DC4FF", "#F6AA00", "#990099", "#84919E", "#000000"];
+let idxKeys = new Array(TSE_SELECTION_COUNT).fill("");
+let idxColors = [...IDX_DEFAULT_COLORS];
+let idxVisible = new Array(TSE_SELECTION_COUNT).fill(true);
 let tseKeys = new Array(TSE_SELECTION_COUNT).fill("");
 let tseColors = [...DEFAULT_COLORS];
 let tseVisible = new Array(TSE_SELECTION_COUNT).fill(true);
@@ -881,10 +883,19 @@ function mapIdxToWeeklyDates(rows, key, weeklyDates, dailyDates){
   return values;
 }
 
-function buildIdxSeries(rows, key, weeklyDates, dailyDates){
-  if(!key) return { dates: weeklyDates, series: [] };
-  const values = mapIdxToWeeklyDates(rows, key, weeklyDates, dailyDates);
-  return { dates: weeklyDates, series: [{ label: key, color: "#2563eb", width: 2, values }] };
+function buildIdxSeries(rows, keys, colors, visible, weeklyDates, dailyDates){
+  const series = [];
+  for(let i=0; i<keys.length; i++){
+    const k = keys[i];
+    if(!k || !visible[i]) continue;
+    const values = mapIdxToWeeklyDates(rows, k, weeklyDates, dailyDates);
+    series.push({ label: k, color: colors[i] || IDX_DEFAULT_COLORS[i % IDX_DEFAULT_COLORS.length], width: 2, values, slotIndex: i });
+  }
+  // 複数選択時は表示範囲の左端を100とした上昇率で比較プロット
+  if(series.length > 1){
+    for(const s of series) s.isNormalized = true;
+  }
+  return { dates: weeklyDates, series };
 }
 
 // 合成項目の定義（複数の差引を合計して計算）
@@ -987,7 +998,7 @@ function renderLegend(elId, data){
   if(!box) return;
   box.innerHTML = '';
   if(!data || !data.series || data.series.length===0) return;
-  const colorPrefix = elId === "tseLegend" ? "tseColor" : (elId === "barLegend" ? "barColor" : null);
+  const colorPrefix = elId === "tseLegend" ? "tseColor" : (elId === "barLegend" ? "barColor" : (elId === "idxLegend" ? "idxColor" : null));
   for(const s of data.series){
     const item = document.createElement('div');
     item.className = 'legend-item';
@@ -1130,9 +1141,9 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, is
     return;
   }
 
-  // 累積データのオフセットを計算（表示範囲の最初の有効な値を0とする）
+  // 累積・正規化用の基準値を計算（表示範囲の最初の有効な値）
   const seriesOffsets = data.series.map(s => {
-    if(!s.isCumulative) return 0;
+    if(!s.isCumulative && !s.isNormalized) return 0;
     for(let i=0; i<visibleAbsIndices.length; i++){
       const absIdx = visibleAbsIndices[i];
       if(absIdx != null && s.values[absIdx] != null && !Number.isNaN(s.values[absIdx])){
@@ -1142,11 +1153,15 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, is
     return 0;
   });
 
-  // 値取得関数（累積の場合はオフセット調整）
+  // 値取得関数（累積は基準値を0に、正規化は基準値を100とした比率に変換）
   const getValue = (s, absIdx, seriesIdx) => {
     const v = s.values[absIdx];
     if(v == null || Number.isNaN(v)) return null;
     if(s.isCumulative) return v - seriesOffsets[seriesIdx];
+    if(s.isNormalized){
+      const base = seriesOffsets[seriesIdx];
+      return base ? v / base * 100 : null;
+    }
     return v;
   };
 
@@ -1467,6 +1482,11 @@ function showTooltipForCanvas(e, canvas, data){
     if(val != null && s.isCumulative && offsets[si] != null){
       val = val - offsets[si];
     }
+    // 複数選択時の株価指数は実値＋起点100の指数を表示
+    if(val != null && s.isNormalized && offsets[si]){
+      html += `<span style="color:${s.color}; font-weight:700;">${s.label}</span>: ${fmt(val)}（${(val / offsets[si] * 100).toFixed(1)}）<br>`;
+      continue;
+    }
     html += `<span style="color:${s.color}; font-weight:700;">${s.label}</span>: ${fmt(val)}<br>`;
   }
   tooltip.innerHTML = html;
@@ -1569,7 +1589,7 @@ function rebuildData(){
   const baseDates = tseDates.length > 0 ? tseDates : idxDates;
 
   // 指数データ: tseDatesにマッピング（日次→週次）
-  idxData = buildIdxSeries(idxRows, idxKey, baseDates, idxDates);
+  idxData = buildIdxSeries(idxRows, idxKeys, idxColors, idxVisible, baseDates, idxDates);
   idxData.dateIndex = buildDateIndex(baseDates);
 
   // 部門別データ（累積折れ線）
@@ -1710,14 +1730,36 @@ function restoreSelectDisplay(selectEl){
 }
 
 function bindSelects(){
-  // 指数セレクト（1つのみ）
-  const idxSel = document.getElementById("idxSel1");
-  fillIdxSelect(idxSel, idxAvail, idxKey);
-  idxSel.addEventListener("change", ()=>{
-    idxKey = idxSel.value || "";
-    try{ localStorage.setItem("idxKey_v4", idxKey); }catch(e){}
-    redrawAll();
-  });
+  // 指数セレクト（8つ、複数選択時は起点100の上昇率比較）
+  for(let i=0; i<TSE_SELECTION_COUNT; i++){
+    const sel = document.getElementById(`idxSel${i+1}`);
+    const colorPicker = document.getElementById(`idxColor${i+1}`);
+    const checkbox = document.getElementById(`idxCheck${i+1}`);
+
+    fillIdxSelect(sel, idxAvail, idxKeys[i]);
+    colorPicker.value = idxColors[i];
+    checkbox.checked = idxVisible[i];
+
+    sel.addEventListener("change", ()=>{
+      idxKeys[i] = sel.value || "";
+      if(idxKeys[i]) idxVisible[i] = true;
+      try{ localStorage.setItem("idxKeys_v1", JSON.stringify(idxKeys)); }catch(e){}
+      try{ localStorage.setItem("idxVisible_v1", JSON.stringify(idxVisible)); }catch(e){}
+      redrawAll();
+    });
+
+    colorPicker.addEventListener("input", ()=>{
+      idxColors[i] = colorPicker.value;
+      try{ localStorage.setItem("idxColors_v1", JSON.stringify(idxColors)); }catch(e){}
+      redrawAll();
+    });
+
+    checkbox.addEventListener("change", ()=>{
+      idxVisible[i] = checkbox.checked;
+      try{ localStorage.setItem("idxVisible_v1", JSON.stringify(idxVisible)); }catch(e){}
+      redrawAll();
+    });
+  }
 
   // 部門別セレクト（累積：8つ、差引累計項目のみ）
   for(let i=0; i<TSE_SELECTION_COUNT; i++){
@@ -1882,9 +1924,34 @@ async function autoLoad(){
 
   // restore selections
   try{
-    const raw = localStorage.getItem("idxKey_v4");
-    if(raw && idxAvail.includes(raw)){
-      idxKey = raw;
+    const raw = localStorage.getItem("idxKeys_v1");
+    if(raw){
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr)){
+        idxKeys = new Array(TSE_SELECTION_COUNT).fill("").map((_, i)=> (arr[i] && idxAvail.includes(arr[i])) ? arr[i] : "");
+      }
+    } else {
+      // 旧バージョン（単一選択）からの移行
+      const old = localStorage.getItem("idxKey_v4");
+      if(old && idxAvail.includes(old)) idxKeys[0] = old;
+    }
+  }catch(e){}
+  try{
+    const raw = localStorage.getItem("idxColors_v1");
+    if(raw){
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr)){
+        idxColors = new Array(TSE_SELECTION_COUNT).fill("").map((_, i)=> arr[i] || IDX_DEFAULT_COLORS[i]);
+      }
+    }
+  }catch(e){}
+  try{
+    const raw = localStorage.getItem("idxVisible_v1");
+    if(raw){
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr)){
+        idxVisible = new Array(TSE_SELECTION_COUNT).fill(true).map((_, i)=> arr[i] !== false);
+      }
     }
   }catch(e){}
 
@@ -1953,11 +2020,11 @@ async function autoLoad(){
 
   // デフォルト値設定
   // 株価指数のデフォルト: TOPIX終値
-  if(!idxKey){
+  if(!idxKeys.some(k => k)){
     if(idxAvail.includes("TOPIX終値")){
-      idxKey = "TOPIX終値";
+      idxKeys[0] = "TOPIX終値";
     } else if(idxAvail[0]){
-      idxKey = idxAvail[0];
+      idxKeys[0] = idxAvail[0];
     }
   }
 
@@ -2183,35 +2250,35 @@ function init(){
     }
   }
 
-  // 操作バー（ヘッダー）の表示/非表示（－で隠し、チャート右上の＋で復元）
+  // チャート右上の常時表示±ボタン（左＝タブ、右＝項目選択欄）。全チャート共通
   {
-    let hh = {};
+    let hh = {}, sh = {};
     try{ hh = JSON.parse(localStorage.getItem("headHidden_v1") || "{}") || {}; }catch(e){}
-    for(const [btnId, cardId] of [["idxHeadHideBtn","idxCard"], ["tseHeadHideBtn","tseCard"], ["barHeadHideBtn","barCard"]]){
-      const btn = document.getElementById(btnId);
-      const card = document.getElementById(cardId);
-      const restore = card.querySelector(".headRestoreBtn");
-      if(!btn || !card || !restore) continue;
+    try{ sh = JSON.parse(localStorage.getItem("selRowHidden_v1") || "{}") || {}; }catch(e){}
+    for(const btn of document.querySelectorAll(".boxBtns .tabBtn")){
+      const card = document.getElementById(btn.dataset.card);
+      if(!card) continue;
       const apply = (hidden)=>{
         card.classList.toggle("headHidden", hidden);
-        hh[cardId] = hidden;
+        btn.textContent = hidden ? "＋" : "－";
+        hh[card.id] = hidden;
         try{ localStorage.setItem("headHidden_v1", JSON.stringify(hh)); }catch(e){}
       };
-      if(hh[cardId]) apply(true);
-      btn.addEventListener("click", ()=> apply(true));
-      restore.addEventListener("click", ()=> apply(false));
+      apply(!!hh[card.id]);
+      btn.addEventListener("click", ()=> apply(!card.classList.contains("headHidden")));
     }
-  }
-
-  // 表示項目（プルダウン部分）だけの折りたたみ（チャート本体は表示したまま）
-  for(const [btnId, rowId] of [["idxSelToggleBtn","idxSelRow"], ["tseSelToggleBtn","tseSelRow"], ["barSelToggleBtn","barSelRow"]]){
-    const btn = document.getElementById(btnId);
-    const row = document.getElementById(rowId);
-    if(!btn || !row) continue;
-    btn.addEventListener("click", ()=>{
-      const hidden = row.classList.toggle("hidden");
-      btn.textContent = hidden ? "＋" : "－";
-    });
+    for(const btn of document.querySelectorAll(".boxBtns .selBtn")){
+      const row = document.getElementById(btn.dataset.row);
+      if(!row) continue;
+      const apply = (hidden)=>{
+        row.classList.toggle("hidden", hidden);
+        btn.textContent = hidden ? "＋" : "－";
+        sh[row.id] = hidden;
+        try{ localStorage.setItem("selRowHidden_v1", JSON.stringify(sh)); }catch(e){}
+      };
+      apply(!!sh[row.id]);
+      btn.addEventListener("click", ()=> apply(!row.classList.contains("hidden")));
+    }
   }
 
   // 各チャートの縮小（－ボタンでプルダウンとチャート本体を折りたたみ）
