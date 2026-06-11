@@ -79,7 +79,7 @@
     .chartTitle{ font-weight:700; font-size:22px; color:#111827; margin-right:auto; }
 
     .legend{ display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
-    .legend-item{ display:flex; align-items:center; gap:6px; font-size:20px; color:#374151; }
+    .legend-item{ display:flex; align-items:center; gap:6px; font-size:18px; color:#374151; }
     .swatch{ width:18px; height:18px; border-radius:3px; border:1px solid rgba(0,0,0,0.15); }
 
     .selRow{
@@ -222,12 +222,29 @@
       background:rgba(255,255,255,0.88);
       border:1px solid var(--line);
       border-radius:10px;
-      padding:6px 12px;
+      padding:6px 22px 6px 12px;
       cursor:move;
       user-select:none;
       touch-action:none;
-      max-width:75%;
+      max-width:90%;
+      min-width:120px;
     }
+    /* 右端のつまみ：横にドラッグして幅を変更（狭くすると項目が縦並びになる） */
+    .chartOverlay .ovResize{
+      position:absolute; top:0; right:0; bottom:0;
+      width:14px;
+      cursor:ew-resize;
+      border-radius:0 10px 10px 0;
+    }
+    .chartOverlay .ovResize::before{
+      content:"";
+      position:absolute; top:50%; right:5px;
+      width:3px; height:24px;
+      margin-top:-12px;
+      border-radius:2px;
+      background:#c3c9d4;
+    }
+    .chartOverlay .ovResize:hover::before{ background:#9aa3b2; }
     .chartOverlay .ovTitle{ font-weight:700; font-size:22px; color:#111827; }
     .headRestoreBtn{
       position:absolute; top:6px; right:6px; z-index:6;
@@ -348,6 +365,7 @@
           <!-- 株価指数チャート（プルダウン1つ） -->
           <div class="chartCard" id="idxCard">
             <div class="chartHead">
+              <button class="toggle-btn sel-toggle-btn" id="idxSelToggleBtn" title="表示項目の表示/非表示">－</button>
               <button class="toggle-btn" id="idxToggleBtn" title="チャートの表示/非表示">－</button>
               <button class="toggle-btn" id="idxHeadHideBtn" title="この操作バーを隠す">－</button>
             </div>
@@ -363,7 +381,7 @@
               <canvas id="idxChart"></canvas>
               <div class="chartOverlay" data-pos="idx" title="ドラッグで移動">
                 <div class="ovTitle">株価指数</div>
-                <div class="legend" id="idxLegend"></div>
+                <div class="legend" id="idxLegend"></div><div class="ovResize" title="ドラッグで幅を変更"></div>
               </div>
               <button class="toggle-btn headRestoreBtn" title="操作バーを表示">＋</button>
             </div>
@@ -393,7 +411,7 @@
               <canvas id="tseChart"></canvas>
               <div class="chartOverlay" data-pos="tse" title="ドラッグで移動">
                 <div class="ovTitle">部門別売買動向（累積）</div>
-                <div class="legend" id="tseLegend"></div>
+                <div class="legend" id="tseLegend"></div><div class="ovResize" title="ドラッグで幅を変更"></div>
               </div>
               <button class="toggle-btn headRestoreBtn" title="操作バーを表示">＋</button>
             </div>
@@ -423,7 +441,7 @@
               <canvas id="barChart"></canvas>
               <div class="chartOverlay" data-pos="bar" title="ドラッグで移動">
                 <div class="ovTitle">部門別売買動向（増減）</div>
-                <div class="legend" id="barLegend"></div>
+                <div class="legend" id="barLegend"></div><div class="ovResize" title="ドラッグで幅を変更"></div>
               </div>
               <button class="toggle-btn headRestoreBtn" title="操作バーを表示">＋</button>
             </div>
@@ -2130,22 +2148,33 @@ function init(){
         ov.style.left = p.x + "px";
         ov.style.top = p.y + "px";
       }
+      if(p && Number.isFinite(p.w) && p.w >= 120){
+        ov.style.width = p.w + "px";
+      }
       ov.addEventListener("pointerdown", (e)=>{
         if(e.target.closest(".swatch")) return; // 凡例の色クリックはドラッグにしない
         e.preventDefault();
         ov.setPointerCapture(e.pointerId);
+        const resizing = !!e.target.closest(".ovResize");
         const startX = e.clientX, startY = e.clientY;
         const startL = ov.offsetLeft, startT = ov.offsetTop;
+        const startW = ov.offsetWidth;
         const onMove = (ev)=>{
-          const maxL = Math.max(0, box.clientWidth - ov.offsetWidth);
-          const maxT = Math.max(0, box.clientHeight - ov.offsetHeight);
-          ov.style.left = Math.min(Math.max(0, startL + ev.clientX - startX), maxL) + "px";
-          ov.style.top = Math.min(Math.max(0, startT + ev.clientY - startY), maxT) + "px";
+          if(resizing){
+            // 右端のつまみ：横ドラッグで幅を変更（狭くすると項目が縦並びになる）
+            const maxW = box.clientWidth - ov.offsetLeft;
+            ov.style.width = Math.min(Math.max(120, startW + ev.clientX - startX), maxW) + "px";
+          } else {
+            const maxL = Math.max(0, box.clientWidth - ov.offsetWidth);
+            const maxT = Math.max(0, box.clientHeight - ov.offsetHeight);
+            ov.style.left = Math.min(Math.max(0, startL + ev.clientX - startX), maxL) + "px";
+            ov.style.top = Math.min(Math.max(0, startT + ev.clientY - startY), maxT) + "px";
+          }
         };
         const onUp = ()=>{
           ov.removeEventListener("pointermove", onMove);
           ov.removeEventListener("pointerup", onUp);
-          ovPos[key] = {x: ov.offsetLeft, y: ov.offsetTop};
+          ovPos[key] = {x: ov.offsetLeft, y: ov.offsetTop, w: ov.offsetWidth};
           try{ localStorage.setItem("overlayPos_v1", JSON.stringify(ovPos)); }catch(err){}
         };
         ov.addEventListener("pointermove", onMove);
@@ -2175,7 +2204,7 @@ function init(){
   }
 
   // 表示項目（プルダウン部分）だけの折りたたみ（チャート本体は表示したまま）
-  for(const [btnId, rowId] of [["tseSelToggleBtn","tseSelRow"], ["barSelToggleBtn","barSelRow"]]){
+  for(const [btnId, rowId] of [["idxSelToggleBtn","idxSelRow"], ["tseSelToggleBtn","tseSelRow"], ["barSelToggleBtn","barSelRow"]]){
     const btn = document.getElementById(btnId);
     const row = document.getElementById(rowId);
     if(!btn || !row) continue;
