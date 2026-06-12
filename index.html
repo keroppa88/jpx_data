@@ -68,14 +68,34 @@
     .grid2{ display:grid; grid-template-columns: 1fr; gap:12px; margin-top:12px; }
     .chartCard{ border:1px solid var(--line); border-radius:12px; background:#fff; overflow:hidden; }
     .cardMain{ display:flex; flex-direction:column; }
-    /* チャート本体＋右側の白スペース＋縦ボタン列 */
+    /* チャート本体＋左右の白スペース（幅はドラッグで調整）＋縦ボタン列 */
     .chartRow{ position:relative; display:flex; align-items:stretch; }
     .canvasBox{ flex:1 1 auto; min-width:0; }
-    .rightPane{
-      flex:0 0 230px;
+    .sidePane{
+      flex:0 0 auto;
       background:#fff;
-      border-left:1px solid var(--line);
     }
+    .leftPane{ width:0; }
+    .rightPane{ width:230px; }
+    /* 縦の仕切り：横にドラッグして隣のスペース幅を調整 */
+    .paneDiv{
+      flex:0 0 9px;
+      cursor:ew-resize;
+      background:#eef1f5;
+      border-left:1px solid var(--line);
+      border-right:1px solid var(--line);
+      display:flex; align-items:center; justify-content:center;
+      touch-action:none;
+      user-select:none;
+    }
+    .paneDiv::before{
+      content:"";
+      width:3px; height:26px;
+      border-radius:2px;
+      background:#c3c9d4;
+    }
+    .paneDiv:hover{ background:#e2e7ee; }
+    .paneDiv:hover::before{ background:#9aa3b2; }
     .btnCol{
       position:absolute; top:6px; right:6px; z-index:7;
       display:flex; flex-direction:column; gap:5px;
@@ -83,7 +103,8 @@
     .btnCol .toggle-btn{ width:35px; height:35px; font-size:24px; }
     /* 折りたたみ時：白い領域ごと消して＋ボタンだけ残す */
     .chartCard.collapsed .canvasBox,
-    .chartCard.collapsed .rightPane,
+    .chartCard.collapsed .sidePane,
+    .chartCard.collapsed .paneDiv,
     .chartCard.collapsed .chartOverlay,
     .chartCard.collapsed .upBtn,
     .chartCard.collapsed .downBtn,
@@ -399,10 +420,13 @@
               </div>
             </div>
             <div class="chartRow">
+              <div class="sidePane leftPane" data-key="idx" data-side="l"></div>
+              <div class="paneDiv" data-key="idx" data-side="l" title="ドラッグで左スペースの幅を調整"></div>
               <div class="canvasBox" id="idxBox">
                 <canvas id="idxChart"></canvas>
               </div>
-              <div class="rightPane"></div>
+              <div class="paneDiv" data-key="idx" data-side="r" title="ドラッグで右スペースの幅を調整"></div>
+              <div class="sidePane rightPane" data-key="idx" data-side="r"></div>
 <div class="chartOverlay" data-pos="idx" title="ドラッグで移動">
                 <div class="ovTitle">株価指数</div>
                 <div class="legend" id="idxLegend"></div><div class="ovResize" title="ドラッグで幅を変更"></div><div class="ovScale" title="ドラッグで文字の大きさを変更"></div>
@@ -434,12 +458,15 @@
               </div>
             </div>
             <div class="chartRow">
+              <div class="sidePane leftPane" data-key="tse" data-side="l"></div>
+              <div class="paneDiv" data-key="tse" data-side="l" title="ドラッグで左スペースの幅を調整"></div>
               <div class="canvasBox" id="tseBox">
                 <canvas id="tseChart"></canvas>
               </div>
-              <div class="rightPane"></div>
+              <div class="paneDiv" data-key="tse" data-side="r" title="ドラッグで右スペースの幅を調整"></div>
+              <div class="sidePane rightPane" data-key="tse" data-side="r"></div>
 <div class="chartOverlay" data-pos="tse" title="ドラッグで移動">
-                <div class="ovTitle">部門別売買動向（累積）</div>
+                <div class="ovTitle">部門別売買動向(累積)</div>
                 <div class="legend" id="tseLegend"></div><div class="ovResize" title="ドラッグで幅を変更"></div><div class="ovScale" title="ドラッグで文字の大きさを変更"></div>
               </div>
               <div class="btnCol">
@@ -469,12 +496,15 @@
               </div>
             </div>
             <div class="chartRow">
+              <div class="sidePane leftPane" data-key="bar" data-side="l"></div>
+              <div class="paneDiv" data-key="bar" data-side="l" title="ドラッグで左スペースの幅を調整"></div>
               <div class="canvasBox" id="barBox">
                 <canvas id="barChart"></canvas>
               </div>
-              <div class="rightPane"></div>
+              <div class="paneDiv" data-key="bar" data-side="r" title="ドラッグで右スペースの幅を調整"></div>
+              <div class="sidePane rightPane" data-key="bar" data-side="r"></div>
 <div class="chartOverlay" data-pos="bar" title="ドラッグで移動">
-                <div class="ovTitle">部門別売買動向（増減）</div>
+                <div class="ovTitle">部門別売買動向(増減)</div>
                 <div class="legend" id="barLegend"></div><div class="ovResize" title="ドラッグで幅を変更"></div><div class="ovScale" title="ドラッグで文字の大きさを変更"></div>
               </div>
               <div class="btnCol">
@@ -2289,6 +2319,42 @@ function init(){
         };
         ov.addEventListener("pointermove", onMove);
         ov.addEventListener("pointerup", onUp);
+      });
+    }
+  }
+
+  // 左右の白スペース幅をドラッグで調整（どちらを広げるかはユーザー次第）
+  {
+    let pw = {};
+    try{ pw = JSON.parse(localStorage.getItem("paneWidths_v1") || "{}") || {}; }catch(e){}
+    for(const pane of document.querySelectorAll(".sidePane")){
+      const saved = pw[pane.dataset.key];
+      const w = saved ? saved[pane.dataset.side] : undefined;
+      if(Number.isFinite(w)) pane.style.width = Math.max(0, w) + "px";
+    }
+    for(const grip of document.querySelectorAll(".paneDiv")){
+      const key = grip.dataset.key, side = grip.dataset.side;
+      const pane = document.querySelector(`.sidePane[data-key="${key}"][data-side="${side}"]`);
+      if(!pane) continue;
+      grip.addEventListener("pointerdown", (e)=>{
+        e.preventDefault();
+        grip.setPointerCapture(e.pointerId);
+        const startX = e.clientX;
+        const startW = pane.getBoundingClientRect().width;
+        const onMove = (ev)=>{
+          const dx = ev.clientX - startX;
+          const w = side === "l" ? startW + dx : startW - dx;
+          pane.style.width = Math.min(600, Math.max(0, w)) + "px";
+        };
+        const onUp = ()=>{
+          grip.removeEventListener("pointermove", onMove);
+          grip.removeEventListener("pointerup", onUp);
+          if(!pw[key]) pw[key] = {};
+          pw[key][side] = Math.round(pane.getBoundingClientRect().width);
+          try{ localStorage.setItem("paneWidths_v1", JSON.stringify(pw)); }catch(err){}
+        };
+        grip.addEventListener("pointermove", onMove);
+        grip.addEventListener("pointerup", onUp);
       });
     }
   }
