@@ -144,7 +144,8 @@
     .chartCard.collapsed .chartOverlay,
     .chartCard.collapsed .upBtn,
     .chartCard.collapsed .downBtn,
-    .chartCard.collapsed .selBtn{ display:none; }
+    .chartCard.collapsed .selBtn,
+    .chartCard.collapsed .dateBtn{ display:none; }
     .chartCard.collapsed .chartRow{ height:47px; }
 
     .legend{ display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
@@ -473,6 +474,7 @@
                 <button class="toggle-btn upBtn" data-card="idxCard" title="チャートを上へ移動">↑</button>
                 <button class="toggle-btn downBtn" data-card="idxCard" title="チャートを下へ移動">↓</button>
                 <button class="toggle-btn selBtn" data-row="idxSelRow" title="項目選択欄の表示/非表示">－</button>
+                <button class="toggle-btn dateBtn" data-key="idx" title="時系列（年月日）の表示/非表示">－</button>
               </div>
             </div>
             <div class="resizeHandle" data-target="idxBox" title="ドラッグで高さ調節"></div>
@@ -511,6 +513,7 @@
                 <button class="toggle-btn upBtn" data-card="tseCard" title="チャートを上へ移動">↑</button>
                 <button class="toggle-btn downBtn" data-card="tseCard" title="チャートを下へ移動">↓</button>
                 <button class="toggle-btn selBtn" data-row="tseSelRow" title="項目選択欄の表示/非表示">－</button>
+                <button class="toggle-btn dateBtn" data-key="tse" title="時系列（年月日）の表示/非表示">－</button>
               </div>
             </div>
             <div class="resizeHandle" data-target="tseBox" title="ドラッグで高さ調節"></div>
@@ -549,6 +552,7 @@
                 <button class="toggle-btn upBtn" data-card="barCard" title="チャートを上へ移動">↑</button>
                 <button class="toggle-btn downBtn" data-card="barCard" title="チャートを下へ移動">↓</button>
                 <button class="toggle-btn selBtn" data-row="barSelRow" title="項目選択欄の表示/非表示">－</button>
+                <button class="toggle-btn dateBtn" data-key="bar" title="時系列（年月日）の表示/非表示">－</button>
               </div>
             </div>
             <div class="resizeHandle" data-target="barBox" title="ドラッグで高さ調節"></div>
@@ -665,6 +669,7 @@ let barColors = [...DEFAULT_COLORS];
 let barVisible = new Array(TSE_SELECTION_COUNT).fill(true);
 
 let hoverDateIdx = null;     // 全チャート共有の十字カーソル位置（表示インデックス）
+let dateLabelsHidden = {idx:false, tse:false, bar:false}; // チャートごとの時系列（年月日）ラベル非表示
 let tseDateMeta = new Map(); // EnDate -> {st: StDate, en: EnDate, pub: PubDate}
 
 /* ========= helpers ========= */
@@ -1385,8 +1390,9 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, is
     }
   }
 
-  // 日付ラベルの表示
-  visibleDates.forEach((d,i)=>{
+  // 日付ラベルの表示（チャートごとに非表示可能）
+  const chartKey = (canvas === idxCanvas) ? "idx" : (canvas === tseCanvas) ? "tse" : "bar";
+  if(!dateLabelsHidden[chartKey]) visibleDates.forEach((d,i)=>{
     if(d && i % Math.ceil(visibleDates.length/6)===0){
       const x = getX(i);
 
@@ -2409,6 +2415,27 @@ function init(){
         };
         grip.addEventListener("pointermove", onMove);
         grip.addEventListener("pointerup", onUp);
+      });
+    }
+  }
+
+  // 時系列（年月日）ラベルの表示/非表示（チャートごとの±ボタン）
+  {
+    try{
+      const saved = JSON.parse(localStorage.getItem("dateLabelsHidden_v1") || "{}") || {};
+      for(const k of ["idx","tse","bar"]) dateLabelsHidden[k] = saved[k] === true;
+    }catch(e){}
+    for(const btn of document.querySelectorAll(".btnCol .dateBtn")){
+      const key = btn.dataset.key;
+      const apply = (hidden)=>{
+        dateLabelsHidden[key] = hidden;
+        btn.textContent = hidden ? "＋" : "－";
+        try{ localStorage.setItem("dateLabelsHidden_v1", JSON.stringify(dateLabelsHidden)); }catch(e){}
+      };
+      apply(!!dateLabelsHidden[key]);
+      btn.addEventListener("click", ()=>{
+        apply(!dateLabelsHidden[key]);
+        redrawAll();
       });
     }
   }
