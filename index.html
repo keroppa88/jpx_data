@@ -1057,6 +1057,11 @@ function buildTseSeries(rows, keys, colors, dates, visible, mode = "line"){
       values = dates.map(d => (map.has(d) ? map.get(d) : null));
     }
 
+    // 増減（縦棒）では「売」を売り越し方向＝マイナスで表示
+    if(barMode && k.endsWith("_売")){
+      values = values.map(v => (v == null ? v : -v));
+    }
+
     const label = barMode && (isCumulative || isComposite) ? k.replace("_差引累計", "_差引") : k;
     series.push({ label, color: colors[i] || DEFAULT_COLORS[i % DEFAULT_COLORS.length], width: 2, values, isCumulative: (isCumulative || isComposite) && !barMode, slotIndex: i });
   }
