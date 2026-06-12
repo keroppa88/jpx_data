@@ -277,7 +277,7 @@
       background:#c3c9d4;
     }
     .chartOverlay .ovResize:hover::before{ background:#9aa3b2; }
-    .chartOverlay .ovTitle{ font-weight:700; font-size:calc(22px * var(--ovScale, 1)); color:#111827; }
+    .chartOverlay .ovTitle{ font-weight:700; font-size:calc(18px * var(--ovScale, 1)); color:#111827; }
     /* 右下のつまみ：斜めドラッグで文字の大きさ（拡大縮小）を変更 */
     .chartOverlay .ovScale{
       position:absolute; right:0; bottom:0;
@@ -2276,6 +2276,17 @@ function init(){
   {
     let ovPos = {};
     try{ ovPos = JSON.parse(localStorage.getItem("overlayPos_v1") || "{}") || {}; }catch(e){}
+    // 文字の大きさ（拡大縮小倍率）は3チャート共通：不揃いにならないようルート要素に適用
+    let ovScale = 1;
+    try{
+      const s = parseFloat(localStorage.getItem("ovScale_v1"));
+      if(Number.isFinite(s) && s >= 0.5 && s <= 3) ovScale = s;
+    }catch(e){}
+    const applyScale = (s)=>{
+      ovScale = Math.min(3, Math.max(0.5, s));
+      document.documentElement.style.setProperty("--ovScale", ovScale);
+    };
+    if(ovScale !== 1) applyScale(ovScale);
     for(const ov of document.querySelectorAll(".chartOverlay")){
       const key = ov.dataset.pos;
       const box = ov.parentElement;
@@ -2287,8 +2298,6 @@ function init(){
       if(p && Number.isFinite(p.w) && p.w >= 120){
         ov.style.width = p.w + "px";
       }
-      let ovScale = (p && Number.isFinite(p.s) && p.s >= 0.5 && p.s <= 3) ? p.s : 1;
-      if(ovScale !== 1) ov.style.setProperty("--ovScale", ovScale);
       ov.addEventListener("pointerdown", (e)=>{
         if(e.target.closest(".swatch")) return; // 凡例の色クリックはドラッグにしない
         e.preventDefault();
@@ -2301,10 +2310,9 @@ function init(){
         const startScale = ovScale;
         const onMove = (ev)=>{
           if(scaling){
-            // 右下のつまみ：斜めドラッグで文字の大きさを変更（0.5～3倍）
+            // 右下のつまみ：斜めドラッグで文字の大きさを変更（0.5～3倍、3チャート連動）
             const d = ((ev.clientX - startX) + (ev.clientY - startY)) / 2;
-            ovScale = Math.min(3, Math.max(0.5, startScale * (1 + d / 150)));
-            ov.style.setProperty("--ovScale", ovScale);
+            applyScale(startScale * (1 + d / 150));
           } else if(resizing){
             // 右端のつまみ：横ドラッグで幅を変更（狭くすると項目が縦並びになる）
             const maxW = box.clientWidth - ov.offsetLeft;
@@ -2319,8 +2327,9 @@ function init(){
         const onUp = ()=>{
           ov.removeEventListener("pointermove", onMove);
           ov.removeEventListener("pointerup", onUp);
-          ovPos[key] = {x: ov.offsetLeft, y: ov.offsetTop, w: ov.offsetWidth, s: ovScale};
+          ovPos[key] = {x: ov.offsetLeft, y: ov.offsetTop, w: ov.offsetWidth};
           try{ localStorage.setItem("overlayPos_v1", JSON.stringify(ovPos)); }catch(err){}
+          try{ localStorage.setItem("ovScale_v1", String(ovScale)); }catch(err){}
         };
         ov.addEventListener("pointermove", onMove);
         ov.addEventListener("pointerup", onUp);
