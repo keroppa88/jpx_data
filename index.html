@@ -15,6 +15,39 @@
       --chip:#f3f4f6;
       --shadow: 0 2px 10px rgba(0,0,0,0.06);
     }
+    /* 色テーマ：bg-dark＝背景のみ黒、full-dark＝チャート以外すべて黒・文字白 */
+    body.bg-dark{ --bg:#000000; }
+    body.full-dark{
+      --bg:#000000;
+      --card:#0a0a0a;
+      --text:#f5f5f5;
+      --muted:#c4c4c4;
+      --line:#3a3a3a;
+      --chip:#1a1a1a;
+      --shadow: 0 2px 10px rgba(0,0,0,0.5);
+    }
+    body.full-dark select,
+    body.full-dark .toggle-btn,
+    body.full-dark .help-btn,
+    body.full-dark .sel,
+    body.full-dark .color-picker{
+      background:#111;
+      color:#f5f5f5;
+      border-color:#444;
+    }
+    body.full-dark .toggle-btn:hover,
+    body.full-dark .help-btn:hover{ background:#222; }
+    body.full-dark .sel .slot{ color:#c4c4c4; }
+    body.full-dark .label{ color:#f5f5f5; }
+    body.full-dark .legend-item{ color:#374151; } /* チャート上のオーバーレイ内は白地のまま */
+    body.full-dark .resizeHandle,
+    body.full-dark .paneDiv{ background:#111; border-color:#3a3a3a; }
+    body.full-dark .resizeHandle::before,
+    body.full-dark .paneDiv::before{ background:#666; }
+    body.full-dark .sidePane{ background:#000; }
+    body.full-dark .selRow,
+    body.full-dark .cardMain{ background:#0a0a0a; color:#f5f5f5; }
+    body.full-dark .canvasBox{ background:#fff; } /* チャート本体は白のまま */
     body{
       margin:0; padding:16px;
       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
@@ -401,6 +434,7 @@
             日付表示
           </label>
           <button class="help-btn" id="helpBtn">説明</button>
+          <button class="help-btn" id="themeBtn" title="押すごとに 背景黒 → 全体黒 → 元に戻る">色</button>
         </div>
 
         <div class="grid2">
@@ -2403,6 +2437,27 @@ function init(){
       const collapsed = card.classList.toggle("collapsed");
       btn.textContent = collapsed ? "＋" : "－";
       if(!collapsed) doResize();
+    });
+  }
+
+  // 色テーマ切替（押すごとに 背景黒 → 全体黒 → 元に戻る）
+  {
+    const themeBtn = document.getElementById("themeBtn");
+    const THEMES = ["", "bg-dark", "full-dark"];
+    let theme = "";
+    try{
+      const t = localStorage.getItem("theme_v1");
+      if(THEMES.includes(t)) theme = t;
+    }catch(e){}
+    const applyTheme = ()=>{
+      document.body.classList.remove("bg-dark", "full-dark");
+      if(theme) document.body.classList.add(theme);
+      try{ localStorage.setItem("theme_v1", theme); }catch(e){}
+    };
+    applyTheme();
+    themeBtn.addEventListener("click", ()=>{
+      theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+      applyTheme();
     });
   }
 
