@@ -73,3 +73,6 @@
 その他金融機関_買	OthFinBuy
 その他金融機関_合計	OthFinTot
 その他金融機関_差引	OthFinBal
+
+### PtoCSV_long.csv
+ほぼ役目を終えた。デスクトップ収集を移行後に削除予定。
