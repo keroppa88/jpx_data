@@ -846,6 +846,42 @@ function parsePtoCsvToLong(text){
   return rows;
 }
 
+// list.csv の指数名 → data/ 配下のファイル名（.csv除く）。不規則なものを明示
+const IDX_DATA_ALIASES = {
+  "日経平均終値": "日経平均株価",
+  "日経半導体株株指数終値": "日経半導体株指数",
+};
+
+// 指数名から data/ 配下の候補ファイル名（.csv抜き）を返す
+function idxDataFileCandidates(name){
+  if(IDX_DATA_ALIASES[name]) return [IDX_DATA_ALIASES[name]];
+  const cands = [];
+  if(name.endsWith("終値")) cands.push(name.slice(0, -2)); // 「終値」を除いた名前
+  cands.push(name);                                        // そのまま
+  return cands;
+}
+
+// 四本値CSV(Date,Open,High,Low,Close,...)から終値だけを取り出してロング形式に
+function parseOhlcCloseToLong(text, name){
+  const lines = text.trim().split(/\r?\n/);
+  if(lines.length < 2) return [];
+  const delim = detectDelimiter(lines[0]);
+  const header = parseDelimitedLine(lines[0], delim).map(cleanHeaderValue);
+  const idxDate = header.indexOf("Date") >= 0 ? header.indexOf("Date") : header.indexOf("日付");
+  const idxClose = header.indexOf("Close") >= 0 ? header.indexOf("Close") : header.indexOf("終値");
+  if(idxDate < 0 || idxClose < 0) return [];
+  const rows = [];
+  for(let i=1; i<lines.length; i++){
+    const cols = parseDelimitedLine(lines[i], delim);
+    if(!cols || cols.length === 0) continue;
+    const date = (cols[idxDate] || "").trim();
+    const value = toNum(cols[idxClose]);
+    if(!date || Number.isNaN(value)) continue;
+    rows.push({date, name, value});
+  }
+  return rows;
+}
+
 function parseTsePrimeToLong(text){
   tseDateMeta = new Map();
   const lines=text.trim().split(/\r?\n/);
@@ -970,28 +1006,18 @@ function mapIdxToWeeklyDates(rows, key, weeklyDates, dailyDates){
   const dailyMap = new Map();
   for(const r of rows){ if(r.name === key) dailyMap.set(r.date, r.value); }
 
-  // 各週次日付に対応する値を探す
+  // weeklyDates・dailyDates とも昇順。二点ポインタで「その週次日付以前で最新の終値」を求める
+  // （日次データが長期＝数千〜万件でも O(週+日) で処理）
   const values = [];
+  let j = 0;
+  let lastVal = null;
   for(const wd of weeklyDates){
-    // 完全一致があればそれを使用
-    if(dailyMap.has(wd)){
-      values.push(dailyMap.get(wd));
-    } else {
-      // 週次日付以前で最も近い日次日付を探す
-      let closestValue = null;
-      let closestDate = null;
-      for(const dd of dailyDates){
-        if(dd <= wd){
-          if(!closestDate || dd > closestDate){
-            closestDate = dd;
-            if(dailyMap.has(dd)){
-              closestValue = dailyMap.get(dd);
-            }
-          }
-        }
-      }
-      values.push(closestValue);
+    while(j < dailyDates.length && dailyDates[j] <= wd){
+      if(dailyMap.has(dailyDates[j])) lastVal = dailyMap.get(dailyDates[j]);
+      j++;
     }
+    // 完全一致を優先（その日に終値があればその値、無ければ直近の終値）
+    values.push(dailyMap.has(wd) ? dailyMap.get(wd) : lastVal);
   }
   return values;
 }
@@ -1987,13 +2013,34 @@ async function autoLoad(){
   }
 
   // プルダウン用リスト
-  const idxNamesFromData = uniqSorted(idxRows.map(r => r.name));
-  const tseNamesFromData = uniqSorted(tseRows.map(r => r.name));
-
   let idxList = null;
   let tseList = null;
   try{ idxList = await loadNameList("./list.csv"); }catch(e){ console.warn(e); }
   try{ tseList = await loadNameList("./bumonlist.csv"); }catch(e){ console.warn(e); }
+
+  // list.csv の各指数を data/ 配下の四本値CSV(終値)から読み込む（dataフォルダがあれば優先）
+  if(idxList){
+    statusEl.textContent += " / 指数データ(data/)読み込み中…";
+    for(const name of idxList){
+      for(const base of idxDataFileCandidates(name)){
+        try{
+          const res = await fetch(`./data/${encodeURIComponent(base)}.csv`, {cache:"no-store"});
+          if(!res.ok) continue;
+          const buf = await res.arrayBuffer();
+          const txt = new TextDecoder("utf-8", {fatal:false}).decode(buf);
+          const rows = parseOhlcCloseToLong(txt, name);
+          if(rows.length){
+            // 既存(PtoCSV)の同名データを置き換えてdataフォルダの終値を採用
+            idxRows = idxRows.filter(r => r.name !== name).concat(rows);
+          }
+          break; // 候補ファイルがヒットしたら終了
+        }catch(e){ /* 次の候補ファイルへ */ }
+      }
+    }
+  }
+
+  const idxNamesFromData = uniqSorted(idxRows.map(r => r.name));
+  const tseNamesFromData = uniqSorted(tseRows.map(r => r.name));
 
   idxAvail = (idxList ? idxList.filter(n => idxNamesFromData.includes(n)) : idxNamesFromData);
   if(idxAvail.length === 0) idxAvail = idxNamesFromData;
