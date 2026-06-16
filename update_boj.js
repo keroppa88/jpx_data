@@ -163,6 +163,15 @@ async function fetchDataChunk(db, codes) {
   return merged;
 }
 
+// 系列オブジェクトから時期配列・値配列を取り出す。
+// getDataCode では VALUES が { SURVEY_DATES:[...], VALUES:[...] } の入れ子になっている。
+function extractSeriesDV(s) {
+  const w = s && s.VALUES && typeof s.VALUES === "object" && !Array.isArray(s.VALUES) ? s.VALUES : null;
+  const dates = w ? (w.SURVEY_DATES || []) : (s.SURVEY_DATES || []);
+  const values = w ? (w.VALUES || []) : (Array.isArray(s.VALUES) ? s.VALUES : []);
+  return { dates: Array.isArray(dates) ? dates : [], values: Array.isArray(values) ? values : [] };
+}
+
 function writeDbCsv(target, seriesList) {
   const codes = [];
   const valueMaps = new Map();
@@ -172,9 +181,7 @@ function writeDbCsv(target, seriesList) {
   for (const s of seriesList) {
     const code = String(s.SERIES_CODE || "").trim();
     if (!code) continue;
-    const dates = s.SURVEY_DATES || [];
-    const values = s.VALUES || [];
-    if (!Array.isArray(dates) || !Array.isArray(values)) continue;
+    const { dates, values } = extractSeriesDV(s);
 
     const m = new Map();
     for (let i = 0; i < dates.length; i++) {
@@ -236,14 +243,15 @@ async function fetchTarget(target) {
       const s = got.get(code);
       const meta1 = metaByCode.get(code) || {};
       if (!s) continue;
+      const { dates, values } = extractSeriesDV(s);
       // 名称・単位・期種はメタ情報を優先（データ応答に欠けても補う）
       seriesList.push({
         SERIES_CODE: code,
         NAME_OF_TIME_SERIES_J: s.NAME_OF_TIME_SERIES_J || meta1.NAME_OF_TIME_SERIES_J || "",
         UNIT_J: s.UNIT_J || meta1.UNIT_J || "",
         FREQUENCY: s.FREQUENCY || meta1.FREQUENCY || target.frequency,
-        SURVEY_DATES: s.SURVEY_DATES || [],
-        VALUES: s.VALUES || [],
+        SURVEY_DATES: dates,
+        VALUES: values,
       });
     }
     await sleep(SLEEP_MS);
