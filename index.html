@@ -1327,41 +1327,38 @@ function calcNiceTicks(minV, maxV, targetCount = 5){
   return ticks;
 }
 
-// 株価指数用のキリのいい数値を計算
-// 折れ線最大値 < 縦軸最大値 を保証
+// 株価指数・政府統計用のキリのいい数値を計算
+// 折れ線最大値 < 縦軸最大値 を保証。任意の桁（数百万規模でも）に対応するため
+// 間隔を 1/2/5×10^k で自動算出する。
 function calcIdxNiceTicks(minV, maxV, targetCount = 5){
-  const range = maxV - minV;
-  if(range === 0) return [minV, minV];
+  let range = maxV - minV;
+  // 範囲が0（単一値・平坦）の場合は値の大きさに応じた小さな帯を作る
+  if(range === 0) range = Math.abs(maxV) > 0 ? Math.abs(maxV) * 0.01 : 1;
 
-  // キリのいい間隔を計算
-  const niceIntervals = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000];
-  const rawInterval = range / targetCount;
+  // キリのいい間隔を 1/2/5×10^k から選ぶ
+  const rawInterval = range / Math.max(1, targetCount);
+  const mag = Math.pow(10, Math.floor(Math.log10(rawInterval)));
+  const norm = rawInterval / mag;
+  let step;
+  if(norm <= 1) step = 1;
+  else if(norm <= 2) step = 2;
+  else if(norm <= 5) step = 5;
+  else step = 10;
+  step *= mag;
 
-  let bestInterval = niceIntervals[0];
-  for(const ni of niceIntervals){
-    if(ni >= rawInterval){
-      bestInterval = ni;
-      break;
-    }
-    bestInterval = ni;
-  }
-
-  // 開始値をキリのいい数値に（minVを含むか下回る）
-  const startTick = Math.floor(minV / bestInterval) * bestInterval;
-  // 終了値をキリのいい数値に（maxVを必ず超える）
-  const endTick = Math.ceil(maxV / bestInterval) * bestInterval;
+  // 開始値・終了値をキリのいい数値に（minVを下回り、maxVを必ず超える）
+  const startTick = Math.floor(minV / step) * step;
+  const endTick = Math.ceil(maxV / step) * step;
 
   const ticks = [];
-  for(let t = startTick; t <= endTick; t += bestInterval){
+  for(let t = startTick; t <= endTick + step * 0.5; t += step){
     ticks.push(t);
-    if(ticks.length > 10) break;
+    if(ticks.length > 20) break;
   }
-
   // 最後のtickがmaxVを超えていることを保証
   if(ticks.length > 0 && ticks[ticks.length - 1] < maxV){
-    ticks.push(ticks[ticks.length - 1] + bestInterval);
+    ticks.push(ticks[ticks.length - 1] + step);
   }
-
   return ticks;
 }
 
