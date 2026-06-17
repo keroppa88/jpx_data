@@ -1,65 +1,42 @@
-// 日本銀行「時系列統計データ検索サイト」API から政府統計（マクロ統計）を取得する。
-// メタデータAPI(getMetadata)で系列コード一覧を取得し、目的の期種に絞り、
-// コードAPI(getDataCode)で250件ずつデータを取得して data/boj/ 配下にCSV出力する。
-// （階層API layer=* は「期種で絞る前の全系列数」で1250制限に掛かるため使わない）
+// 日本銀行「時系列統計データ検索サイト」API から政府統計を取得する。
+// bojlist.csv に列挙された系列だけをコードAPI(getDataCode)で取得し、
+// data/boj/<ファイル>.csv（ワイド形式）と _catalog.csv を出力する。
+// bojlist.csv が「収集」と「表示」の単一ソース。
 //
 // このサービスは、日本銀行時系列統計データ検索サイトのAPI機能を使用しています。
 // サービスの内容は日本銀行によって保証されたものではありません。
 //
 // ・APIキー不要。高頻度アクセス禁止のためリクエスト間に間隔を空ける。
-// ・出力: data/boj/<DB>_<期種>.csv（ワイド形式: Date,<系列コード>,...）
-//         data/boj/_catalog.csv（系列コード・名称・単位・期種・既定集約の一覧）
 
 const https = require("https");
 const zlib = require("zlib");
 const fs = require("fs");
 const path = require("path");
 
-const OUT_DIR = path.join(__dirname, "data", "boj");
+const ROOT = __dirname;
+const OUT_DIR = path.join(ROOT, "data", "boj");
+const LIST_FILE = path.join(ROOT, "bojlist.csv");
 const HOST = "www.stat-search.boj.or.jp";
-const META_BASE = "/api/v1/getMetadata";
 const CODE_BASE = "/api/v1/getDataCode";
 
-// 取得開始期（YYYYMM）。日次・週次・月次は YYYYMM 形式で指定する。
-const START_DATE = process.env.BOJ_START || "200001";
-
-// 1リクエストの系列コード数上限は250。安全側で200ずつ。
-const CODE_BATCH = 200;
-const SLEEP_MS = 1500; // 高頻度アクセス回避
+const START_DATE = process.env.BOJ_START || "200001"; // YYYYMM
+const CODE_BATCH = 200;   // 1リクエストの系列コード数上限は250。安全側で200。
+const SLEEP_MS = 1500;    // 高頻度アクセス回避
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-// 取得対象。db=DB名, frequency=期種(D/W/M/Q/CY/FY), suffix=ファイル名サフィックス,
-// agg=既定の集約方法（last=期末値 / sum=合計）。系列ごとの上書きは bojlist.csv で行う。
-const TARGETS = [
-  { db: "FM08", frequency: "D", suffix: "D", agg: "last", label: "外国為替市況(日次)" },
-  { db: "CO",   frequency: "Q", suffix: "Q", agg: "last", label: "日銀短観(四半期)", optional: true },
-  { db: "FM01", frequency: "D", suffix: "D", agg: "last", label: "無担保コールO/N物レート(日次)" },
-  { db: "PR01", frequency: "M", suffix: "M", agg: "last", label: "企業物価指数(月次)" },
-  { db: "MD02", frequency: "M", suffix: "M", agg: "last", label: "マネーストック(月次)" },
-  { db: "FM09", frequency: "M", suffix: "M", agg: "last", label: "実効為替レート(月次)" },
-  { db: "MD01", frequency: "M", suffix: "M", agg: "last", label: "マネタリーベース(月次)" },
-];
 
 function httpsGetGzip(pathWithQuery) {
   return new Promise((resolve, reject) => {
     https.get(
-      {
-        host: HOST,
-        path: pathWithQuery,
-        headers: { "Accept-Encoding": "gzip", "User-Agent": "jpx_data-boj/1.0" },
-      },
+      { host: HOST, path: pathWithQuery, headers: { "Accept-Encoding": "gzip", "User-Agent": "jpx_data-boj/1.0" } },
       (res) => {
         const chunks = [];
         res.on("data", (c) => chunks.push(c));
         res.on("end", () => {
           let buf = Buffer.concat(chunks);
-          try {
-            if ((res.headers["content-encoding"] || "").includes("gzip")) buf = zlib.gunzipSync(buf);
-          } catch (e) { return reject(new Error("gunzip失敗: " + e.message)); }
+          try { if ((res.headers["content-encoding"] || "").includes("gzip")) buf = zlib.gunzipSync(buf); }
+          catch (e) { return reject(new Error("gunzip失敗: " + e.message)); }
           const text = buf.toString("utf8");
-          if (res.statusCode < 200 || res.statusCode >= 300) {
-            return reject(new Error(`HTTP ${res.statusCode}: ${text.slice(0, 300)}`));
-          }
+          if (res.statusCode < 200 || res.statusCode >= 300) return reject(new Error(`HTTP ${res.statusCode}: ${text.slice(0, 300)}`));
           resolve(text);
         });
       }
@@ -67,16 +44,13 @@ function httpsGetGzip(pathWithQuery) {
   });
 }
 
-// レスポンスJSONから系列配列を再帰的に探す（SERIES_CODE を持つオブジェクトの配列）。
 function findSeriesArray(node) {
   if (Array.isArray(node)) {
     if (node.length && node.every((x) => x && typeof x === "object" && "SERIES_CODE" in x)) return node;
     for (const el of node) { const r = findSeriesArray(el); if (r) return r; }
     return null;
   }
-  if (node && typeof node === "object") {
-    for (const k of Object.keys(node)) { const r = findSeriesArray(node[k]); if (r) return r; }
-  }
+  if (node && typeof node === "object") for (const k of Object.keys(node)) { const r = findSeriesArray(node[k]); if (r) return r; }
   return null;
 }
 
@@ -90,25 +64,16 @@ function getNextPosition(json) {
 
 function checkStatus(json, ctx) {
   const status = json && json.STATUS != null ? String(json.STATUS) : "";
-  if (status && status !== "200") {
-    throw new Error(`${ctx} STATUS ${status}: ${(json.MESSAGE || "").trim()}`);
-  }
+  if (status && status !== "200") throw new Error(`${ctx} STATUS ${status}: ${(json.MESSAGE || "").trim()}`);
 }
 
-// target.frequency と、メタ情報の FREQUENCY 文字列の対応判定。
-function freqMatches(freqStr, targetFreq) {
-  const f = String(freqStr || "").toUpperCase();
-  switch (targetFreq) {
-    case "D": return f === "DAILY";
-    case "W": return f.startsWith("WEEKLY");
-    case "M": return f === "MONTHLY";
-    case "Q": return f === "QUARTERLY";
-    case "CY": return f === "ANNUAL";
-    case "FY": return f === "ANNUAL(MAR)";
-    case "CH": return f === "SEMIANNUAL";
-    case "FH": return f === "SEMIANNUAL(SEP)";
-    default: return true;
-  }
+// 系列オブジェクトから時期配列・値配列を取り出す。
+// getDataCode では VALUES が { SURVEY_DATES:[...], VALUES:[...] } の入れ子になっている。
+function extractSeriesDV(s) {
+  const w = s && s.VALUES && typeof s.VALUES === "object" && !Array.isArray(s.VALUES) ? s.VALUES : null;
+  const dates = w ? (w.SURVEY_DATES || []) : (s.SURVEY_DATES || []);
+  const values = w ? (w.VALUES || []) : (Array.isArray(s.VALUES) ? s.VALUES : []);
+  return { dates: Array.isArray(dates) ? dates : [], values: Array.isArray(values) ? values : [] };
 }
 
 // SURVEY_DATES の各期を共通形式（YYYY-MM-DD / YYYY-MM）に正規化する。
@@ -120,11 +85,9 @@ function normalizeDate(raw, freq) {
     const q = parseInt(s.slice(4, 6), 10);
     return `${s.slice(0, 4)}-${["03", "06", "09", "12"][Math.max(1, Math.min(4, q)) - 1]}`;
   }
-  if (f.startsWith("SEMIANNUAL") && /^\d{6}$/.test(s)) {
-    return `${s.slice(0, 4)}-${parseInt(s.slice(4, 6), 10) === 2 ? "12" : "06"}`;
-  }
-  if (/^\d{6}$/.test(s)) return `${s.slice(0, 4)}-${s.slice(4, 6)}`; // 月次
-  if (/^\d{4}$/.test(s)) return `${s}-12`;                          // 暦年・年度
+  if (f.startsWith("SEMIANNUAL") && /^\d{6}$/.test(s)) return `${s.slice(0, 4)}-${parseInt(s.slice(4, 6), 10) === 2 ? "12" : "06"}`;
+  if (/^\d{6}$/.test(s)) return `${s.slice(0, 4)}-${s.slice(4, 6)}`;
+  if (/^\d{4}$/.test(s)) return `${s}-12`;
   return s;
 }
 
@@ -134,17 +97,34 @@ function csvEscape(v) {
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-// メタデータAPIで DB の系列一覧を取得（{SERIES_CODE, FREQUENCY, NAME_OF_TIME_SERIES_J, UNIT_J}）。
-async function fetchMetadata(db) {
-  const params = new URLSearchParams({ format: "json", lang: "jp", db });
-  const json = JSON.parse(await httpsGetGzip(`${META_BASE}?${params.toString()}`));
-  checkStatus(json, `getMetadata(${db})`);
-  return findSeriesArray(json) || [];
+// bojlist.csv を読み、ファイル単位の収集スペックに変換する。
+function parseList(text) {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim() && !l.trim().startsWith("#"));
+  if (lines.length < 2) return [];
+  const header = lines[0].split(",").map((h) => h.replace(/^﻿/, "").replace(/^"+|"+$/g, "").trim());
+  const idxFile = header.indexOf("ファイル");
+  const idxCode = header.indexOf("系列コード");
+  const idxAgg = header.indexOf("集約");
+  if (idxFile < 0 || idxCode < 0) throw new Error("bojlist.csv: 必須列(ファイル/系列コード)がありません");
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(",").map((c) => c.replace(/^"+|"+$/g, "").trim());
+    const file = cols[idxFile], code = cols[idxCode];
+    if (!file || !code) continue;
+    rows.push({ file, code, agg: (idxAgg >= 0 ? (cols[idxAgg] || "") : "").toLowerCase() });
+  }
+  return rows;
 }
 
-// コードAPIで指定コード群のデータを取得（250件以下／同一期種）。NEXTPOSITIONでページング。
+// ファイル名(例 FM08_D)から DB名・期種サフィックスを得る。
+function splitFile(file) {
+  const i = file.lastIndexOf("_");
+  return i > 0 ? { db: file.slice(0, i), suffix: file.slice(i + 1) } : { db: file, suffix: "" };
+}
+
+// コードAPIで指定コード群のデータを取得（NEXTPOSITIONページング）。
 async function fetchDataChunk(db, codes) {
-  const merged = new Map(); // code -> series object
+  const merged = new Map();
   let startPosition = null, guard = 0;
   while (guard++ < 500) {
     const params = new URLSearchParams({ format: "json", lang: "jp", db, code: codes.join(","), startDate: START_DATE });
@@ -163,116 +143,84 @@ async function fetchDataChunk(db, codes) {
   return merged;
 }
 
-// 系列オブジェクトから時期配列・値配列を取り出す。
-// getDataCode では VALUES が { SURVEY_DATES:[...], VALUES:[...] } の入れ子になっている。
-function extractSeriesDV(s) {
-  const w = s && s.VALUES && typeof s.VALUES === "object" && !Array.isArray(s.VALUES) ? s.VALUES : null;
-  const dates = w ? (w.SURVEY_DATES || []) : (s.SURVEY_DATES || []);
-  const values = w ? (w.VALUES || []) : (Array.isArray(s.VALUES) ? s.VALUES : []);
-  return { dates: Array.isArray(dates) ? dates : [], values: Array.isArray(values) ? values : [] };
-}
+// 1ファイル分（同一DB・同一期種の系列群）を取得してCSV出力する。
+async function fetchFile(file, codes) {
+  const { db, suffix } = splitFile(file);
+  const got = new Map();
+  for (let i = 0; i < codes.length; i += CODE_BATCH) {
+    const chunk = codes.slice(i, i + CODE_BATCH);
+    const m = await fetchDataChunk(db, chunk);
+    for (const [k, v] of m) got.set(k, v);
+    await sleep(SLEEP_MS);
+  }
 
-function writeDbCsv(target, seriesList) {
-  const codes = [];
+  const outCodes = [];
   const valueMaps = new Map();
   const allDates = new Set();
-  const catalogRows = [];
+  const catalog = [];
 
-  for (const s of seriesList) {
-    const code = String(s.SERIES_CODE || "").trim();
-    if (!code) continue;
+  for (const code of codes) {
+    const s = got.get(code);
+    if (!s) continue;
     const { dates, values } = extractSeriesDV(s);
-
     const m = new Map();
     for (let i = 0; i < dates.length; i++) {
       const raw = values[i];
       if (raw == null || raw === "null" || raw === "") continue;
       const v = Number(String(raw).replace(/,/g, ""));
       if (!Number.isFinite(v)) continue;
-      const d = normalizeDate(dates[i], s.FREQUENCY || target.frequency);
+      const d = normalizeDate(dates[i], s.FREQUENCY || suffix);
       m.set(d, v);
       allDates.add(d);
     }
     if (m.size === 0) continue;
-    codes.push(code);
+    outCodes.push(code);
     valueMaps.set(code, m);
-    catalogRows.push({
-      file: `${target.db}_${target.suffix}`,
-      code,
+    catalog.push({
+      file, code,
       name: String(s.NAME_OF_TIME_SERIES_J || "").trim(),
       unit: String(s.UNIT_J || "").trim(),
-      freq: String(s.FREQUENCY || target.frequency).trim(),
-      agg: target.agg,
+      freq: String(s.FREQUENCY || suffix).trim(),
     });
   }
 
-  if (codes.length === 0) return { rows: 0, codes: 0, catalog: [] };
+  if (outCodes.length === 0) return { rows: 0, codes: 0, catalog: [] };
 
   const sortedDates = Array.from(allDates).sort();
-  const lines = [["Date", ...codes].join(",")];
+  const lines = [["Date", ...outCodes].join(",")];
   for (const d of sortedDates) {
     const row = [d];
-    for (const code of codes) { const m = valueMaps.get(code); row.push(m.has(d) ? m.get(d) : ""); }
+    for (const code of outCodes) { const m = valueMaps.get(code); row.push(m.has(d) ? m.get(d) : ""); }
     lines.push(row.map(csvEscape).join(","));
   }
-  fs.writeFileSync(path.join(OUT_DIR, `${target.db}_${target.suffix}.csv`), lines.join("\n") + "\n", "utf8");
-  return { rows: sortedDates.length, codes: codes.length, catalog: catalogRows };
-}
-
-async function fetchTarget(target) {
-  // 1) メタ情報で系列コードを取得し、目的の期種だけに絞る
-  const meta = await fetchMetadata(target.db);
-  await sleep(SLEEP_MS);
-  const metaByCode = new Map();
-  const codes = [];
-  for (const m of meta) {
-    const code = String(m.SERIES_CODE || "").trim();
-    if (!code) continue;
-    if (!freqMatches(m.FREQUENCY, target.frequency)) continue;
-    metaByCode.set(code, m);
-    codes.push(code);
-  }
-  if (codes.length === 0) return { rows: 0, codes: 0, catalog: [] };
-
-  // 2) コードAPIで250件以下ずつデータ取得
-  const seriesList = [];
-  for (let i = 0; i < codes.length; i += CODE_BATCH) {
-    const chunk = codes.slice(i, i + CODE_BATCH);
-    const got = await fetchDataChunk(target.db, chunk);
-    for (const code of chunk) {
-      const s = got.get(code);
-      const meta1 = metaByCode.get(code) || {};
-      if (!s) continue;
-      const { dates, values } = extractSeriesDV(s);
-      // 名称・単位・期種はメタ情報を優先（データ応答に欠けても補う）
-      seriesList.push({
-        SERIES_CODE: code,
-        NAME_OF_TIME_SERIES_J: s.NAME_OF_TIME_SERIES_J || meta1.NAME_OF_TIME_SERIES_J || "",
-        UNIT_J: s.UNIT_J || meta1.UNIT_J || "",
-        FREQUENCY: s.FREQUENCY || meta1.FREQUENCY || target.frequency,
-        SURVEY_DATES: dates,
-        VALUES: values,
-      });
-    }
-    await sleep(SLEEP_MS);
-  }
-  return writeDbCsv(target, seriesList);
+  fs.writeFileSync(path.join(OUT_DIR, `${file}.csv`), lines.join("\n") + "\n", "utf8");
+  return { rows: sortedDates.length, codes: outCodes.length, catalog };
 }
 
 async function main() {
   if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
-  console.log(`日銀API 政府統計の取得を開始します（startDate=${START_DATE}）`);
+  const list = parseList(fs.readFileSync(LIST_FILE, "utf8"));
+  if (list.length === 0) { console.error("bojlist.csv に有効な系列がありません。"); process.exit(1); }
 
+  // ファイル単位にまとめる（順序を保持）
+  const byFile = new Map();
+  const aggByCode = new Map();
+  for (const r of list) {
+    if (!byFile.has(r.file)) byFile.set(r.file, []);
+    if (!byFile.get(r.file).includes(r.code)) byFile.get(r.file).push(r.code);
+    aggByCode.set(r.file + "|" + r.code, r.agg === "sum" ? "sum" : "last");
+  }
+
+  console.log(`日銀API 政府統計の取得を開始します（startDate=${START_DATE}, ファイル数=${byFile.size}）`);
   const catalog = [];
-  for (const target of TARGETS) {
+  for (const [file, codes] of byFile) {
     try {
-      const res = await fetchTarget(target);
+      const res = await fetchFile(file, codes);
+      for (const c of res.catalog) c.agg = aggByCode.get(c.file + "|" + c.code) || "last";
       catalog.push(...res.catalog);
-      console.log(`✅ ${target.db}_${target.suffix} (${target.label}): 系列${res.codes} / 期間${res.rows}`);
+      console.log(`✅ ${file}: 系列${res.codes}/${codes.length} / 期間${res.rows}`);
     } catch (e) {
-      const msg = `${target.db}_${target.suffix} (${target.label}): ${e.message}`;
-      if (target.optional) console.warn(`⏭️  スキップ ${msg}`);
-      else console.error(`❌ エラー ${msg}`);
+      console.error(`❌ エラー ${file}: ${e.message}`);
     }
     await sleep(SLEEP_MS);
   }
