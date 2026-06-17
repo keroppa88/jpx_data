@@ -314,7 +314,7 @@
       background:#c3c9d4;
     }
     .chartOverlay .ovResize:hover::before{ background:#9aa3b2; }
-    .chartOverlay .ovTitle{ font-weight:700; font-size:calc(24px * var(--ovScale, 1)); color:#9ca3af; }
+    .chartOverlay .ovTitle{ font-weight:700; font-size:calc(18px * var(--ovScale, 1)); color:#111827; }
     /* 右下のつまみ：斜めドラッグで文字の大きさ（拡大縮小）を変更 */
     .chartOverlay .ovScale{
       position:absolute; right:0; bottom:0;
@@ -1668,7 +1668,12 @@ function formatIdxAxisValue(v){
     // 1000以上：そのまま表示
     return Math.round(v).toLocaleString();
   } else {
-    return v.toFixed(0);
+    // 1000未満：整数はそのまま、小数（金利など小さい値）は桁に応じて保持
+    if(Number.isInteger(v)) return String(v);
+    const d = absV < 1 ? 3 : (absV < 100 ? 2 : 1);
+    let s = v.toFixed(d);
+    if(s.indexOf('.') >= 0) s = s.replace(/0+$/, '').replace(/\.$/, '');
+    return s;
   }
 }
 
