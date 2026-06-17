@@ -655,6 +655,13 @@
 /* ========= colors ========= */
 const DEFAULT_COLORS = ["#FF4B00","#005AFF","#03AF7A","#4DC4FF","#F6AA00","#990099","#84919E","#000000"];
 const MAX_DISPLAY = 700;
+// 折れ線グラフ描画領域の左上に出すグレー題名
+const CHART_TITLES = {
+  idx: "株価指数",
+  tse: "部門別売買動向(累積)",
+  bar: "部門別売買動向(増減)",
+  boj: "日銀統計",
+};
 const TSE_SELECTION_COUNT = 8;
 
 /* ========= TSEPrime: 英語列名 -> 日本語表示名 ========= */
@@ -1386,6 +1393,21 @@ function drawChartGeneric(ctx, canvas, data, visibleDates, visibleAbsIndices, is
   const chartH=h-pad.t-pad.b;
 
   ctx.clearRect(0,0,w,h);
+
+  // 折れ線グラフ描画領域の左上にグレー文字で題名を描画
+  {
+    const tkey = (canvas === idxCanvas) ? "idx" : (canvas === tseCanvas) ? "tse" : (canvas === bojCanvas) ? "boj" : "bar";
+    const title = CHART_TITLES[tkey];
+    if(title){
+      ctx.save();
+      ctx.font = "bold 30px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
+      ctx.fillStyle = '#9ca3af';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText(title, pad.l + 8, pad.t + 30);
+      ctx.restore();
+    }
+  }
 
   ctx.font = "22px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
 
