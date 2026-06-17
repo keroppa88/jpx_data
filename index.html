@@ -165,14 +165,14 @@
       flex-wrap:wrap;
       align-items:center;
     }
-    /* 増減チャートの表示項目は横4×縦2のグリッド */
-    #barSelContainer{
+    /* 増減・政府統計チャートの表示項目は横4×縦2のグリッド */
+    #barSelContainer, #bojSelContainer{
       display:grid;
       grid-template-columns:repeat(4, minmax(0, 1fr));
       gap:8px;
       width:100%;
     }
-    #barSelContainer select{
+    #barSelContainer select, #bojSelContainer select{
       min-width:0;
       flex:1;
       width:100%;
