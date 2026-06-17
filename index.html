@@ -573,10 +573,6 @@
           <div class="chartCard" id="bojCard">
             <div class="cardMain">
             <div class="selRow" id="bojSelRow" style="padding:8px 12px;">
-              <div id="bojCatRow" style="margin-bottom:8px; display:flex; align-items:center; gap:6px;">
-                <span style="font-weight:700;">大分類</span>
-                <select id="bojCat" style="min-width:220px;"></select>
-              </div>
               <div id="bojSelContainer">
                 <div class="sel"><div class="slot">1</div><select id="bojSel1"></select><input type="color" class="color-picker" id="bojColor1" value="#2563eb"><input type="checkbox" class="show-check" id="bojCheck1" checked title="表示/非表示"></div>
                 <div class="sel"><div class="slot">2</div><select id="bojSel2"></select><input type="color" class="color-picker" id="bojColor2" value="#FF4B00"><input type="checkbox" class="show-check" id="bojCheck2" checked title="表示/非表示"></div>
@@ -737,7 +733,7 @@ let bojAvail = [];           // プルダウンに出す表示名の一覧（全
 let bojAgg = new Map();      // 表示名 -> 集約方法 ("last"=期末 / "sum"=合計)
 let bojByCat = new Map();    // 大分類(file) -> [表示名,...]
 let bojCats = [];            // [{file, label}] 大分類の一覧
-let bojCategory = "";        // 現在選択中の大分類(file)
+let bojOptions = [];         // プルダウン候補 [{value:表示名, text:"大分類・表示名"}]（全項目横断）
 // 大分類(file)の表示ラベル。未定義のものはfileのまま表示する。
 const BOJ_CATEGORY_LABELS = {
   "FM08_D": "外国為替市況",
@@ -2123,7 +2119,7 @@ function bindSelects(){
     const checkbox = document.getElementById(`bojCheck${i+1}`);
     if(!sel || !colorPicker || !checkbox) continue;
 
-    fillIdxSelect(sel, bojCurrentAvail(), bojKeys[i]);
+    fillBojSelect(sel, bojOptions, bojKeys[i]);
     colorPicker.value = bojColors[i];
     checkbox.checked = bojVisible[i];
 
@@ -2224,7 +2220,7 @@ function parseBojList(text){
 
 // 政府統計データを data/boj/ から読み込む。bojlist.csv（厳選）を優先し、無ければ _catalog.csv 全件。
 async function loadBojData(){
-  bojRows = []; bojAvail = []; bojAgg = new Map(); bojByCat = new Map(); bojCats = [];
+  bojRows = []; bojAvail = []; bojAgg = new Map(); bojByCat = new Map(); bojCats = []; bojOptions = [];
 
   let catalog = [];
   try{ catalog = parseBojCatalog(await fetchTextUtf8("./data/boj/_catalog.csv")); }catch(e){ /* 未収集 */ }
@@ -2275,44 +2271,30 @@ async function loadBojData(){
   bojCats = catOrder.map(file => ({ file, label: BOJ_CATEGORY_LABELS[file] || file }));
 }
 
-// 現在選択中の大分類に属する系列のみを返す
-function bojCurrentAvail(){
-  if(bojCategory && bojByCat.has(bojCategory)) return bojByCat.get(bojCategory);
-  return bojAvail;
-}
-// 8つのセレクトを現在の大分類の系列で埋め直す（分類外の選択は解除）
-function refillBojSelects(){
-  const avail = bojCurrentAvail();
-  for(let i=0; i<TSE_SELECTION_COUNT; i++){
-    const sel = document.getElementById(`bojSel${i+1}`);
-    if(!sel) continue;
-    if(bojKeys[i] && !avail.includes(bojKeys[i])) bojKeys[i] = "";
-    fillIdxSelect(sel, avail, bojKeys[i]);
-  }
-}
-// 大分類セレクタの構築と挙動
-function bindBojCategory(){
-  const cat = document.getElementById('bojCat');
-  if(!cat) return;
-  cat.innerHTML = "";
+// プルダウン候補を「大分類・項目」表記で全項目横断に構築する（value=表示名）
+function buildBojOptions(){
+  bojOptions = [];
   for(const c of bojCats){
-    const o = document.createElement('option');
-    o.value = c.file; o.textContent = c.label;
-    cat.appendChild(o);
+    const label = c.label;
+    for(const name of (bojByCat.get(c.file) || [])){
+      bojOptions.push({ value: name, text: label + "・" + name });
+    }
   }
-  cat.value = bojCategory;
-  cat.addEventListener('change', ()=>{
-    bojCategory = cat.value;
-    try{ localStorage.setItem('bojCategory_v1', bojCategory); }catch(e){}
-    // 大分類を切り替えたら、その分類の先頭から最大2系列を自動選択
-    bojKeys = new Array(TSE_SELECTION_COUNT).fill("");
-    const avail = bojCurrentAvail();
-    for(let i=0; i<Math.min(2, avail.length); i++) bojKeys[i] = avail[i];
-    bojVisible = new Array(TSE_SELECTION_COUNT).fill(true);
-    try{ localStorage.setItem('bojKeys_v1', JSON.stringify(bojKeys)); }catch(e){}
-    refillBojSelects();
-    redrawAll();
-  });
+}
+// 表示名（value）と「大分類・項目」（text）を持つ候補でセレクトを埋める
+function fillBojSelect(selectEl, options, current){
+  selectEl.innerHTML = "";
+  const optEmpty = document.createElement("option");
+  optEmpty.value = "";
+  optEmpty.textContent = "— 選択してください —";
+  selectEl.appendChild(optEmpty);
+  for(const o of options){
+    const opt = document.createElement("option");
+    opt.value = o.value;
+    opt.textContent = o.text;
+    selectEl.appendChild(opt);
+  }
+  selectEl.value = current || "";
 }
 
 /* ========= main load ========= */
@@ -2508,21 +2490,16 @@ async function autoLoad(){
     }
   }catch(e){}
 
-  // 大分類の復元（保存値が有効ならそれ、無ければ先頭の大分類）
-  bojCategory = (bojCats.length ? bojCats[0].file : "");
-  try{
-    const savedCat = localStorage.getItem("bojCategory_v1");
-    if(savedCat && bojByCat.has(savedCat)) bojCategory = savedCat;
-  }catch(e){}
+  // プルダウン候補（全項目横断・「大分類・項目」表記）を構築
+  buildBojOptions();
 
-  // 政府統計チャートの選択状態を復元（現在の大分類に属するもののみ）
+  // 政府統計チャートの選択状態を復元（全項目から）
   try{
     const raw = localStorage.getItem("bojKeys_v1");
     if(raw){
       const arr = JSON.parse(raw);
       if(Array.isArray(arr)){
-        const avail = bojCurrentAvail();
-        bojKeys = new Array(TSE_SELECTION_COUNT).fill("").map((_, i)=> (arr[i] && avail.includes(arr[i])) ? arr[i] : "");
+        bojKeys = new Array(TSE_SELECTION_COUNT).fill("").map((_, i)=> (arr[i] && bojAvail.includes(arr[i])) ? arr[i] : "");
       }
     }
   }catch(e){}
@@ -2544,10 +2521,9 @@ async function autoLoad(){
       }
     }
   }catch(e){}
-  // 政府統計のデフォルト：選択中の大分類の先頭から最大2系列を自動選択
+  // 政府統計のデフォルト：先頭から最大2系列を自動選択
   if(!bojKeys.some(k => k)){
-    const avail = bojCurrentAvail();
-    for(let i=0; i<Math.min(2, avail.length); i++) bojKeys[i] = avail[i];
+    for(let i=0; i<Math.min(2, bojAvail.length); i++) bojKeys[i] = bojAvail[i];
   }
 
   // 旧バージョンの保存値を整理（累積チャート＝累計項目のみ、増減チャート＝個別項目のみ）
@@ -2607,7 +2583,6 @@ async function autoLoad(){
   updateTopChips();
 
   bindSelects();
-  bindBojCategory();
   redrawAll();
 
   statusEl.textContent =
