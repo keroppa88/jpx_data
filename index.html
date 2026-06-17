@@ -314,7 +314,7 @@
       background:#c3c9d4;
     }
     .chartOverlay .ovResize:hover::before{ background:#9aa3b2; }
-    .chartOverlay .ovTitle{ font-weight:700; font-size:calc(18px * var(--ovScale, 1)); color:#111827; }
+    .chartOverlay .ovTitle{ font-weight:700; font-size:calc(24px * var(--ovScale, 1)); color:#9ca3af; }
     /* 右下のつまみ：斜めドラッグで文字の大きさ（拡大縮小）を変更 */
     .chartOverlay .ovScale{
       position:absolute; right:0; bottom:0;
@@ -593,7 +593,7 @@
               <div class="paneDiv" data-key="boj" data-side="r" title="ドラッグで右スペースの幅を調整"></div>
               <div class="sidePane rightPane" data-key="boj" data-side="r"></div>
 <div class="chartOverlay" data-pos="boj" title="ドラッグで移動">
-                <div class="ovTitle">政府統計(日銀)</div>
+                <div class="ovTitle">日銀統計</div>
                 <div class="legend" id="bojLegend"></div><div class="ovResize" title="ドラッグで幅を変更"></div><div class="ovScale" title="ドラッグで文字の大きさを変更"></div>
               </div>
               <div class="btnCol">
@@ -611,7 +611,7 @@
 
         <div class="credit">
           このサービスは、日本銀行時系列統計データ検索サイトのAPI機能を使用しています。サービスの内容は日本銀行によって保証されたものではありません。<br>
-          政府統計（最下段）：日本銀行 時系列統計データ検索サイト ／ 株価指数・部門別売買動向：JPX・J-Quants API
+          日銀統計（最下段）：日本銀行 時系列統計データ検索サイト ／ 株価指数・部門別売買動向：JPX・J-Quants API
         </div>
       </div>
     </div>
@@ -2315,7 +2315,7 @@ async function autoLoad(){
 
   // 政府統計（日銀API）データ
   try{
-    statusEl.textContent += " / 政府統計 読み込み中…";
+    statusEl.textContent += " / 日銀統計 読み込み中…";
     await loadBojData();
   }catch(e){
     console.warn(e);
